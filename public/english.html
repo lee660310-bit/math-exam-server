@@ -96,10 +96,34 @@ footer{margin-top:60px;padding:20px 0;border-top:1px solid var(--line);font-size
 .mode-section.on{display:block}
 
 @media(max-width:560px){.card{padding:16px}pre{font-size:.78rem;padding:16px}}
+/* ── 비밀번호 화면 ── */
+#pwScreen{position:fixed;inset:0;background:var(--paper);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.pw-card{background:var(--card);border:1.5px solid var(--line);border-radius:20px;padding:48px 40px;width:100%;max-width:400px;text-align:center;}
+.pw-logo{font-size:40px;margin-bottom:16px;}
+.pw-card h2{font-size:1.4rem;font-weight:800;margin-bottom:6px;}
+.pw-card p{color:var(--ink-soft);font-size:.9rem;margin-bottom:28px;}
+.pw-input{width:100%;padding:13px 16px;border:1.5px solid var(--line);border-radius:12px;font:inherit;font-size:1rem;text-align:center;letter-spacing:3px;outline:none;margin-bottom:12px;}
+.pw-input:focus{border-color:var(--navy);outline:2px solid var(--hl);outline-offset:1px;}
+.pw-btn{width:100%;padding:14px;background:var(--navy);color:#fff;border:none;border-radius:12px;font:inherit;font-size:1rem;font-weight:800;cursor:pointer;}
+.pw-btn:hover{background:var(--navy-deep);}
+.pw-error{color:var(--red);font-size:.85rem;margin-top:8px;min-height:20px;}
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<!-- 비밀번호 화면 -->
+<div id="pwScreen">
+  <div class="pw-card">
+    <div class="pw-logo">📖</div>
+    <h2>리더스학원 영어 생성기</h2>
+    <p>교사 전용 서비스입니다.<br>비밀번호를 입력하세요.</p>
+    <input type="password" class="pw-input" id="pwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">접속하기</button>
+    <div class="pw-error" id="pwError"></div>
+  </div>
+</div>
+
+<div class="wrap" id="mainContent" style="display:none;">
 
 <header>
   <div class="eyebrow">LEADERS ACADEMY · ENGLISH</div>
@@ -318,9 +342,26 @@ footer{margin-top:60px;padding:20px 0;border-top:1px solid var(--line);font-size
 </section>
 
 <footer>리더스학원 영어 내신 문제 생성 도구 v2.0 · 수학 생성기: <a href="/" style="color:var(--navy)">메인으로</a></footer>
-</div>
+</div><!-- /mainContent -->
 
 <script>
+/* ── 비밀번호 확인 ── */
+const CORRECT_PW = '리더스2026';
+function checkPw() {
+  const pw = document.getElementById('pwInput').value.trim();
+  const err = document.getElementById('pwError');
+  if (pw === CORRECT_PW) {
+    document.getElementById('pwScreen').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+  } else {
+    err.textContent = '비밀번호가 틀렸습니다.';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+  }
+}
+// 페이지 로드 시 비밀번호 입력창에 포커스
+window.addEventListener('load', () => document.getElementById('pwInput').focus());
+
 /* ── 모드 전환 ── */
 function switchMode(m) {
   document.querySelectorAll('.mode-tab').forEach((t,i) => t.classList.toggle('on', ['exam','hanline','analyze'][i] === m));
