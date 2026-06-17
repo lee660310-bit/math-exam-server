@@ -118,6 +118,12 @@ app.post('/api/generate-with-files', upload.array('files', 5), async (req, res) 
   }
 });
 
+// ── 영어 페이지 ──
+app.get('/english', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'english.html'));
+});
+
+// ── 나머지는 index.html ──
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
