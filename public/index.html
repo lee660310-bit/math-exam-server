@@ -516,6 +516,147 @@ function showError(msg){
 }
 
 // ── PDF 인쇄 (window.print 방식) ──
+function mdToHtml(text) {
+  // 수식 보호 ($ 구간 먼저 추출)
+  const mathBlocks = [];
+  text = text.replace(/\$\$[\s\S]*?\$\$|\$[^$\n]+?\$/g, m => {
+    mathBlocks.push(m);
+    return `%%MATH${mathBlocks.length-1}%%`;
+  });
+
+  // 마크다운 변환
+  // 헤더
+  text = text.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // 굵게/기울임
+  text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // 수평선
+  text = text.replace(/^---+$/gm, '<hr>');
+  // 표 변환
+  text = text.replace(/(\|.+\|\n)((?:\|[-:| ]+\|\n)?)((?:\|.+\|\n?)*)/g, (match, header, sep, body) => {
+    const parseRow = row => row.trim().split('|').filter((_,i,a)=>i>0&&i<a.length-1).map(c=>`<td>${c.trim()}</td>`).join('');
+    const parseHeader = row => row.trim().split('|').filter((_,i,a)=>i>0&&i<a.length-1).map(c=>`<th>${c.trim()}</th>`).join('');
+    const hRow = `<tr>${parseHeader(header)}</tr>`;
+    const bRows = body.trim().split('\n').filter(r=>r.trim()).map(r=>`<tr>${parseRow(r)}</tr>`).join('');
+    return `<table><thead>${hRow}</thead><tbody>${bRows}</tbody></table>`;
+  });
+  // 리스트
+  text = text.replace(/^- (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+  // 인용
+  text = text.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  // 줄바꿈
+  text = text.replace(/\n\n/g, '</p><p>');
+  text = '<p>' + text + '</p>';
+  text = text.replace(/<p>\s*(<h[1-6]|<ul|<table|<hr|<blockquote)/g, '$1');
+  text = text.replace(/(<\/h[1-6]>|<\/ul>|<\/table>|<hr>|<\/blockquote>)\s*<\/p>/g, '$1');
+
+  // 수식 복원
+  text = text.replace(/%%MATH(\d+)%%/g, (_, i) => mathBlocks[parseInt(i)]);
+  return text;
+}
+
+function buildExamSheet(raw, info, today) {
+  const lines = raw.split('\n');
+  let html = '';
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    // 문항 시작
+    const qMatch = line.match(/^▣\s*(\d+)\.\s*(?:\(([^)]+)\))?\s*(.*)$/);
+    if (qMatch) {
+      const num = qMatch[1];
+      const type = qMatch[2] || '';
+      const rest = qMatch[3];
+      const metaMatch = rest.match(/\[배점[:\s]*([^\]]+)\]|\[유형[:\s]*([^\]]+)\]|\[난이도[:\s]*([^\]]+)\]/g);
+      const metas = metaMatch ? metaMatch.map(m=>`<span class="q-meta">${m.replace(/[\[\]]/g,'')}</span>`).join('') : '';
+      const typeTag = type ? `<span class="q-type">${type}</span>` : '';
+      const bodyText = rest.replace(/\[배점[^\]]*\]|\[유형[^\]]*\]|\[난이도[^\]]*\]/g,'').trim();
+      html += `<div class="q-block">`;
+      html += `<div class="q-header"><span class="q-num">${num}.</span>${typeTag}${metas}</div>`;
+      if (bodyText) html += `<div class="q-body">${bodyText}</div>`;
+      // 다음 줄들 (문제 본문 + 선지)
+      i++;
+      let choices = [];
+      while (i < lines.length) {
+        const l = lines[i].trim();
+        if (/^▣/.test(l) || /^▶/.test(l) || /^===/.test(l)) break;
+        if (/^[①②③④⑤]/.test(l)) {
+          choices.push(l);
+        } else {
+          if (choices.length > 0) {
+            html += `<div class="choices">${choices.map(c=>`<div class="choice">${c}</div>`).join('')}</div>`;
+            choices = [];
+          }
+          if (l) html += `<div class="q-body">${l}</div>`;
+        }
+        i++;
+      }
+      if (choices.length > 0) {
+        html += `<div class="choices">${choices.map(c=>`<div class="choice">${c}</div>`).join('')}</div>`;
+      }
+      html += `</div>`;
+      continue;
+    }
+    // 서술형
+    const saMatch = line.match(/^▣\s*(?:\(서술형\))?\s*(\d+)?\s*\[배점[:\s]*([^\]]+)\]/);
+    if (saMatch || /^▣\s*\(서술형\)/.test(line)) {
+      const scoreMatch = line.match(/\[배점[:\s]*([^\]]+)\]/);
+      const score = scoreMatch ? scoreMatch[1] : '';
+      html += `<div class="q-block subj-block">`;
+      html += `<div class="q-header"><span class="q-type-subj">서술형</span>${score?`<span class="q-meta">배점: ${score}</span>`:''}</div>`;
+      i++;
+      while (i < lines.length) {
+        const l = lines[i].trim();
+        if (/^▣/.test(l) || /^▶/.test(l) || /^===/.test(l)) break;
+        if (l) html += `<div class="q-body">${l}</div>`;
+        i++;
+      }
+      html += `<div class="subj-answer-space"></div></div>`;
+      continue;
+    }
+    if (line) html += `<div class="q-body" style="margin-left:0">${line}</div>`;
+    i++;
+  }
+  return html;
+}
+
+function buildAnswerSheet(raw, info, today) {
+  // 마크다운 변환 후 해설 블록 파싱
+  const lines = raw.split('\n');
+  let html = '';
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    // 정답 블록
+    const ansMatch = line.match(/^▶\s*(\d+)번\s*정답[:\s]*(.+)/);
+    if (ansMatch) {
+      const num = ansMatch[1];
+      const ans = ansMatch[2];
+      html += `<div class="ans-block">`;
+      html += `<div class="ans-header"><span class="ans-num">${num}번</span><span class="ans-answer">✅ 정답: ${ans}</span></div>`;
+      i++;
+      let explain = '';
+      while (i < lines.length) {
+        const l = lines[i].trim();
+        if (/^▶/.test(l) || /^===/.test(l)) break;
+        explain += l + '\n';
+        i++;
+      }
+      html += `<div class="ans-explain">${mdToHtml(explain)}</div>`;
+      html += `</div>`;
+      continue;
+    }
+    if (line) html += `<p>${mdToHtml(line)}</p>`;
+    i++;
+  }
+  return html || mdToHtml(raw);
+}
+
 function printPDF(type) {
   const text = lastResult;
   const info = lastInfo;
@@ -526,23 +667,24 @@ function printPDF(type) {
   const examRaw = examMatch ? examMatch[1].trim() : text;
   const ansRaw  = ansMatch  ? ansMatch[1].trim()  : text;
 
-  let html = '';
+  let bodyHtml = '';
   if (type === 'exam' || type === 'both') {
-    html += buildPrintHTML(examRaw, info, today, false);
+    bodyHtml += buildPrintPage(examRaw, info, today, false);
   }
   if (type === 'both') {
-    html += '<div style="page-break-before:always"></div>';
+    bodyHtml += '<div style="page-break-before:always"></div>';
   }
   if (type === 'answer' || type === 'both') {
-    html += buildPrintHTML(ansRaw, info, today, true);
+    bodyHtml += buildPrintPage(ansRaw, info, today, true);
   }
   if (type === 'all') {
-    html += buildPrintHTML(text, info, today, false);
+    bodyHtml += buildPrintPage(text, info, today, false);
   }
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']], displayMath: [['$$','$$'],['\\\\[','\\\\]']] },
@@ -551,70 +693,168 @@ window.MathJax = {
 <\/script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js"><\/script>
 <style>
-  body { font-family: 'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif; padding:0; margin:0; font-size:13px; color:#111; line-height:1.8; }
-  .page { padding:20mm 18mm; max-width:210mm; margin:0 auto; }
-  h1 { font-size:18px; font-weight:900; text-align:center; border-bottom:2.5px solid #111; padding-bottom:10px; margin-bottom:16px; }
-  .meta { display:flex; justify-content:space-between; font-size:11.5px; color:#555; border-bottom:1px solid #ddd; padding-bottom:8px; margin-bottom:18px; }
-  .q-block { margin-bottom:20px; }
-  .q-num { font-weight:800; color:#2563eb; display:inline-block; min-width:26px; }
-  .q-meta { font-size:10px; background:#f0f4ff; border-radius:3px; padding:1px 6px; margin-left:4px; color:#555; }
-  .q-body { margin:6px 0 6px 26px; }
-  .choices { margin:6px 0 0 26px; display:grid; grid-template-columns:1fr 1fr; gap:3px 14px; font-size:12.5px; }
-  .ans-block { border-left:3px solid #2563eb; padding-left:12px; margin-bottom:18px; }
-  .ans-label { font-weight:800; color:#2563eb; font-size:12.5px; }
-  .ans-answer { color:#16a34a; font-weight:700; margin:4px 0; }
-  .ans-explain { font-size:12.5px; }
-  .footer { text-align:center; font-size:10px; color:#999; margin-top:30px; border-top:1px solid #eee; padding-top:10px; }
-  .teacher-only { color:#dc2626; font-weight:700; }
-  @media print {
-    @page { margin:15mm; size:A4; }
-    body { font-size:12px; }
-    .no-print { display:none; }
-  }
-  table { border-collapse:collapse; width:100%; margin:8px 0; font-size:12px; }
-  th,td { border:1px solid #ddd; padding:5px 8px; }
-  th { background:#f5f7ff; font-weight:600; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:#fff; color:#111; font-size:13px; line-height:1.8; }
+.page { padding:18mm 16mm; max-width:210mm; margin:0 auto; }
+
+/* 헤더 */
+.exam-header { text-align:center; margin-bottom:20px; }
+.school-name { font-size:22px; font-weight:900; letter-spacing:8px; margin-bottom:4px; }
+.exam-title { font-size:15px; font-weight:700; color:#2563eb; border-top:2px solid #111; border-bottom:2px solid #111; padding:6px 0; margin:10px 0; }
+.info-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; border:1px solid #111; margin-bottom:14px; }
+.info-cell { padding:6px 10px; font-size:12px; border-right:1px solid #111; }
+.info-cell:last-child { border-right:none; }
+.info-cell .label { font-size:10px; color:#555; }
+
+/* 유의사항 */
+.caution { font-size:11.5px; border:1px solid #ddd; padding:8px 12px; margin-bottom:16px; background:#fafafa; }
+.caution ol { padding-left:16px; }
+.caution li { margin:2px 0; }
+
+/* 섹션 구분 */
+.section-bar { background:#111; color:#fff; font-size:12.5px; font-weight:700; padding:5px 12px; margin:16px 0 12px; border-radius:3px; }
+
+/* 문항 */
+.q-block { margin-bottom:18px; padding-bottom:14px; border-bottom:1px dashed #e0e0e0; }
+.q-block:last-child { border-bottom:none; }
+.q-header { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.q-num { background:#2563eb; color:#fff; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex-shrink:0; }
+.q-type { background:rgba(124,58,237,0.12); border:1px solid #7c3aed; color:#7c3aed; font-size:10px; font-weight:700; padding:1px 7px; border-radius:3px; }
+.q-type-subj { background:rgba(220,38,38,0.1); border:1px solid #dc2626; color:#dc2626; font-size:10px; font-weight:700; padding:1px 7px; border-radius:3px; }
+.q-meta { background:#f0f4ff; font-size:10px; padding:1px 6px; border-radius:3px; color:#555; }
+.q-body { margin:4px 0 4px 32px; font-size:13.5px; }
+.choices { margin:8px 0 0 32px; display:grid; grid-template-columns:1fr 1fr; gap:4px 20px; font-size:13px; }
+.choice { padding:2px 0; }
+
+/* 서술형 */
+.subj-block { border:1px solid #ddd; border-radius:6px; padding:12px 14px; background:#fafffe; }
+.subj-answer-space { margin-top:10px; min-height:80px; border-bottom:1px solid #bbb; }
+
+/* 해설 */
+.ans-block { border-left:3px solid #2563eb; padding:10px 14px; margin-bottom:16px; background:#f8faff; border-radius:0 6px 6px 0; }
+.ans-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.ans-num { background:#2563eb; color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:3px; }
+.ans-answer { color:#16a34a; font-weight:700; font-size:13.5px; }
+.ans-explain { font-size:12.5px; line-height:1.85; }
+.ans-explain p { margin:4px 0; }
+.ans-explain strong { color:#1a1a2e; }
+.ans-explain h3 { font-size:13px; margin:8px 0 4px; color:#2563eb; }
+.ans-explain table { border-collapse:collapse; width:100%; margin:6px 0; font-size:12px; }
+.ans-explain th, .ans-explain td { border:1px solid #ddd; padding:4px 8px; }
+.ans-explain th { background:#f0f4ff; font-weight:600; }
+.ans-explain ul { padding-left:18px; margin:4px 0; }
+.ans-explain blockquote { border-left:3px solid #ddd; padding-left:10px; color:#555; margin:4px 0; }
+
+/* 분석 결과용 */
+.content h1 { font-size:16px; font-weight:900; margin:16px 0 8px; border-bottom:2px solid #2563eb; padding-bottom:4px; color:#2563eb; }
+.content h2 { font-size:14px; font-weight:800; margin:14px 0 6px; color:#1a1a2e; }
+.content h3 { font-size:13px; font-weight:700; margin:10px 0 4px; }
+.content h4 { font-size:12.5px; font-weight:700; margin:8px 0 4px; }
+.content table { border-collapse:collapse; width:100%; margin:8px 0; font-size:12px; }
+.content th, .content td { border:1px solid #ddd; padding:5px 8px; }
+.content th { background:#f0f4ff; font-weight:600; }
+.content ul { padding-left:18px; margin:4px 0; }
+.content li { margin:2px 0; }
+.content strong { font-weight:700; }
+.content blockquote { border-left:3px solid #ddd; padding:4px 10px; color:#555; margin:6px 0; background:#fafafa; }
+.content hr { border:none; border-top:1px solid #eee; margin:12px 0; }
+.content p { margin:4px 0; }
+
+/* 정답란 */
+.answer-box { display:inline-block; width:60px; height:20px; border-bottom:1.5px solid #111; vertical-align:middle; margin-left:8px; }
+
+/* 푸터 */
+.footer { text-align:center; font-size:10px; color:#888; margin-top:24px; border-top:1px solid #eee; padding-top:8px; }
+
+@media print {
+  @page { margin:10mm; size:A4; }
+  body { font-size:12px; }
+  .no-print { display:none !important; }
+}
 </style>
 </head><body>
-${html}
+${bodyHtml}
 <script>
-  window.onload = function() {
-    if(window.MathJax) {
-      MathJax.startup.promise.then(function(){
-        MathJax.typesetPromise().then(function(){
-          setTimeout(function(){ window.print(); }, 500);
-        });
+window.onload = function() {
+  if(window.MathJax) {
+    MathJax.startup.promise.then(function(){
+      MathJax.typesetPromise().then(function(){
+        setTimeout(function(){ window.print(); }, 600);
       });
-    } else {
-      setTimeout(function(){ window.print(); }, 1000);
-    }
-  };
+    });
+  } else {
+    setTimeout(function(){ window.print(); }, 1200);
+  }
+};
 <\/script>
 </body></html>`);
   w.document.close();
 }
 
-function buildPrintHTML(raw, info, today, isAnswer) {
-  const title = isAnswer
-    ? `${info.subject} 해설지 (교사용)`
-    : `${info.subject} 시험지`;
-  const teacherNote = isAnswer
-    ? `<span class="teacher-only">⚠️ 학생 배포 금지</span>` : '';
+function buildPrintPage(raw, info, today, isAnswer) {
+  const hasStructure = /===EXAM_START===|===ANSWER_START===|▣\s*\d+\.|▶\s*\d+번/.test(raw);
+  const mc = info.mc || 15;
+  const sa = info.sa || 5;
+  const total = info.total || 100;
 
+  if (isAnswer) {
+    return `<div class="page">
+      <div class="exam-header">
+        <div class="school-name">${info.school.replace(/등학교|중학교|고등학교|중학교/,'').split('').join(' ')}</div>
+        <div class="exam-title">${info.grade} ${info.examType} | ${info.subject} 해설지 (교사용)</div>
+      </div>
+      <div style="background:#fff0f0;border:1.5px solid #dc2626;border-radius:4px;padding:6px 12px;font-size:12px;color:#dc2626;font-weight:700;margin-bottom:16px;text-align:center;">⚠️ 교사용 — 학생 배포 절대 금지</div>
+      <div class="ans-body">${buildAnswerSheet(raw, info, today)}</div>
+      <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 본 시험지의 저작권은 리더스학원에 있습니다. | 출제일: ${today}</div>
+    </div>`;
+  }
+
+  const hasExamStructure = /▣\s*\d+\./.test(raw);
+
+  if (hasExamStructure) {
+    // 문제 생성 모드 - 시험지 레이아웃
+    const mcSection = `<div class="section-bar">▣ 객관식 (1~${mc}번) &nbsp; 각 문항 배점 확인 &nbsp; 총 ${Math.round(total*0.6)}점</div>`;
+    const saSection = `<div class="section-bar">▣ 서술형 (${parseInt(mc)+1}~${parseInt(mc)+parseInt(sa)}번) &nbsp; 총 ${Math.round(total*0.4)}점</div>`;
+
+    return `<div class="page">
+      <div class="exam-header">
+        <div class="school-name">${info.school.split('').join(' ')}</div>
+        <div class="exam-title">${info.grade} ${info.examType} | ${info.subject}</div>
+      </div>
+      <div class="info-row">
+        <div class="info-cell"><div class="label">시험일시</div>2025년 &nbsp;&nbsp; 월 &nbsp;&nbsp; 일</div>
+        <div class="info-cell"><div class="label">학년/반/번호</div>${info.grade} &nbsp;&nbsp; 반 &nbsp;&nbsp; 번</div>
+        <div class="info-cell"><div class="label">이름 / 점수</div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; / ${total}점</div>
+      </div>
+      <div class="caution">
+        <strong>※ 유의사항</strong>
+        <ol>
+          <li>답안지에 학년·반·번호·성명을 정확히 기입하시오.</li>
+          <li>객관식 문항은 가장 적절한 답 하나를 고르시오.</li>
+          <li>서술형은 반드시 풀이 과정을 단계별로 작성하시오. 풀이 없는 정답은 0점 처리됩니다.</li>
+          <li>계산기 사용 불가. 시험 범위: ${info.range}</li>
+        </ol>
+      </div>
+      ${mcSection}
+      ${buildExamSheet(raw, info, today)}
+      <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 무단 복제·배포·전송 금지 | 출제일: ${today}</div>
+    </div>`;
+  }
+
+  // 분석 모드 - 마크다운 변환
   return `<div class="page">
-    <h1>📐 ${title}</h1>
-    <div class="meta">
-      <span>${info.school} ${info.grade} | ${info.examType}</span>
-      ${!isAnswer ? `<span>객관식 ${info.mc}문항 + 서술형 ${info.sa}문항 = ${info.total}점</span>` : ''}
-      <span>${today} ${teacherNote}</span>
+    <div class="exam-header">
+      <div class="school-name">${info.school.split('').join(' ')}</div>
+      <div class="exam-title">${info.grade} ${info.examType} | ${info.subject} 기출 분석 보고서</div>
     </div>
-    <div class="content">${raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-    <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 본 시험지의 저작권은 리더스학원에 있습니다.</div>
+    <div class="content">${mdToHtml(raw)}</div>
+    <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 출제일: ${today}</div>
   </div>`;
 }
 
 // init
 switchMode('analyze');
+
 </script>
 </body>
 </html>
