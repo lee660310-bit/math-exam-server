@@ -599,24 +599,40 @@ function buildExamSheet(raw, info, today) {
   raw = raw.replace(/^---+$/gm, '');
   raw = raw.replace(/^\*\*.*\*\*$/gm, '');
   const lines = raw.split('\n');
-  let html = '';
+
+  let mcHtml = '';   // 객관식 (2단)
+  let saHtml = '';   // 서술형 (1단, 풀이 공간 넉넉)
+  let isMC = true;   // 처음엔 객관식
   let i = 0;
+
   while (i < lines.length) {
     const line = lines[i].trim();
-    // 문항 시작
+
+    // 서술형 섹션 구분자 감지
+    if (/서술형/.test(line) && /섹션|section|▣.*서술형|## 서술형/i.test(line)) {
+      isMC = false; i++; continue;
+    }
+
+    // 문항 시작 (객관식)
     const qMatch = line.match(/^▣\s*(\d+)\.\s*(?:\(([^)]+)\))?\s*(.*)$/);
     if (qMatch) {
-      const num = qMatch[1];
+      const num = parseInt(qMatch[1]);
       const type = qMatch[2] || '';
       const rest = qMatch[3];
+
+      // 서술형 감지: 타입에 "서술형" 포함 또는 번호가 mc 초과
+      const mc = parseInt(info.mc) || 15;
+      if (type.includes('서술형') || num > mc) isMC = false;
+
       const metaMatch = rest.match(/\[배점[:\s]*([^\]]+)\]|\[유형[:\s]*([^\]]+)\]|\[난이도[:\s]*([^\]]+)\]/g);
       const metas = metaMatch ? metaMatch.map(m=>`<span class="q-meta">${m.replace(/[\[\]]/g,'')}</span>`).join('') : '';
-      const typeTag = type ? `<span class="q-type">${type}</span>` : '';
+      const typeTag = type && !type.includes('객관식') && !type.includes('서술형') ? `<span class="q-type">${type}</span>` : '';
       const bodyText = rest.replace(/\[배점[^\]]*\]|\[유형[^\]]*\]|\[난이도[^\]]*\]/g,'').trim();
-      html += `<div class="q-block">`;
-      html += `<div class="q-header"><span class="q-num">${num}.</span>${typeTag}${metas}</div>`;
-      if (bodyText) html += `<div class="q-body">${bodyText}</div>`;
-      // 다음 줄들 (문제 본문 + 선지)
+
+      let block = `<div class="q-block${isMC?'':' subj-wide'}">`;
+      block += `<div class="q-header"><span class="q-num">${num}.</span>${typeTag}${metas}</div>`;
+      if (bodyText) block += `<div class="q-body">${bodyText}</div>`;
+
       i++;
       let choices = [];
       while (i < lines.length) {
@@ -626,40 +642,67 @@ function buildExamSheet(raw, info, today) {
           choices.push(l);
         } else {
           if (choices.length > 0) {
-            html += `<div class="choices">${choices.map(c=>`<div class="choice">${c}</div>`).join('')}</div>`;
+            block += `<div class="choices">${choices.map(c=>`<div class="choice">${c}</div>`).join('')}</div>`;
             choices = [];
           }
-          if (l) html += `<div class="q-body">${l}</div>`;
+          if (l) block += `<div class="q-body">${l}</div>`;
         }
         i++;
       }
       if (choices.length > 0) {
-        html += `<div class="choices">${choices.map(c=>`<div class="choice">${c}</div>`).join('')}</div>`;
+        block += `<div class="choices">${choices.map(c=>`<div class="choice">${c}</div>`).join('')}</div>`;
       }
-      html += `</div>`;
+
+      // 서술형이면 풀이 공간 추가
+      if (!isMC) {
+        block += `<div class="subj-answer-space-wide"></div>`;
+      }
+      block += `</div>`;
+
+      if (isMC) mcHtml += block;
+      else saHtml += block;
       continue;
     }
-    // 서술형
-    const saMatch = line.match(/^▣\s*(?:\(서술형\))?\s*(\d+)?\s*\[배점[:\s]*([^\]]+)\]/);
-    if (saMatch || /^▣\s*\(서술형\)/.test(line)) {
+
+    // 서술형 블록 (▣ (서술형) 형식)
+    if (/^▣\s*\(서술형\)/.test(line)) {
+      isMC = false;
       const scoreMatch = line.match(/\[배점[:\s]*([^\]]+)\]/);
       const score = scoreMatch ? scoreMatch[1] : '';
-      html += `<div class="q-block subj-block">`;
-      html += `<div class="q-header"><span class="q-type-subj">서술형</span>${score?`<span class="q-meta">배점: ${score}</span>`:''}</div>`;
+      let block = `<div class="q-block subj-wide">`;
+      block += `<div class="q-header"><span class="q-type-subj">서술형</span>${score?`<span class="q-meta">배점: ${score}</span>`:''}</div>`;
       i++;
       while (i < lines.length) {
         const l = lines[i].trim();
         if (/^▣/.test(l) || /^▶/.test(l) || /^===/.test(l)) break;
-        if (l) html += `<div class="q-body">${l}</div>`;
+        if (l) block += `<div class="q-body">${l}</div>`;
         i++;
       }
-      html += `<div class="subj-answer-space"></div></div>`;
+      block += `<div class="subj-answer-space-wide"></div></div>`;
+      saHtml += block;
       continue;
     }
-    if (line) html += `<div class="q-body" style="margin-left:0">${line}</div>`;
+
+    if (line) {
+      if (isMC) mcHtml += `<div class="q-body" style="margin-left:0">${line}</div>`;
+      else saHtml += `<div class="q-body" style="margin-left:0">${line}</div>`;
+    }
     i++;
   }
-  return html;
+
+  const mc = parseInt(info.mc) || 15;
+  const sa = parseInt(info.sa) || 5;
+  const total = parseInt(info.total) || 100;
+  const saStart = mc + 1;
+  const saEnd = mc + sa;
+  const saScore = Math.round(total * 0.4);
+
+  let result = '';
+  if (mcHtml) result += `<div class="two-col">${mcHtml}</div>`;
+  if (saHtml) result += `
+    <div class="section-bar" style="margin-top:20px;">▣ 서술형 (${saStart}~${saEnd}번) &nbsp; 총 ${saScore}점 &nbsp; — 반드시 풀이 과정을 단계별로 작성하시오</div>
+    <div class="sa-section">${saHtml}</div>`;
+  return result;
 }
 
 function buildAnswerSheet(raw, info, today) {
@@ -773,6 +816,12 @@ body { font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-ser
 /* 서술형 */
 .subj-block { border:1px solid #ddd; border-radius:6px; padding:12px 14px; background:#fafffe; }
 .subj-answer-space { margin-top:10px; min-height:80px; border-bottom:1px solid #bbb; }
+/* 서술형 전용 (1단, 풀이공간 넉넉) */
+.subj-wide { break-inside:avoid; margin-bottom:24px; padding-bottom:16px; border-bottom:1px dashed #e0e0e0; }
+.subj-answer-space-wide { margin-top:14px; min-height:180px; border:1px dashed #bbb; border-radius:4px; background:#fafffe; position:relative; }
+.subj-answer-space-wide::after { content:'풀이'; position:absolute; top:8px; left:12px; font-size:10px; color:#bbb; }
+.sa-section { padding:0; }
+.sa-section .q-body { font-size:13.5px; }
 
 /* 해설 */
 .ans-block { border-left:3px solid #2563eb; padding:10px 14px; margin-bottom:16px; background:#f8faff; border-radius:0 6px 6px 0; }
@@ -892,7 +941,7 @@ function buildPrintPage(raw, info, today, isAnswer) {
         </ol>
       </div>
       ${mcSection}
-      <div class="two-col">${buildExamSheet(raw, info, today)}</div>
+      ${buildExamSheet(raw, info, today)}
       <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 무단 복제·배포·전송 금지 | 출제일: ${today}</div>
     </div>`;
   }
