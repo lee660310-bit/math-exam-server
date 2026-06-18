@@ -1154,59 +1154,53 @@ async function downloadBothPDF() {
 async function renderToPDF(sourceEl, filename) {
   const { jsPDF } = window.jspdf;
 
-  // MathJax 먼저 완료 보장
+  // 숨김 전용 캡처 컨테이너에 복사
+  const clone = sourceEl.cloneNode(true);
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;top:0;left:-9999px;width:860px;background:#fff;padding:36px 48px;z-index:-9999;';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  // MathJax 렌더링
   if (window.MathJax) {
-    await MathJax.typesetPromise([sourceEl]).catch(() => {});
+    await MathJax.typesetPromise([wrapper]).catch(() => {});
   }
+  await sleep(600);
 
-  // 숨김 탭인 경우 임시로 강제 표시
-  const parentPanel = sourceEl.closest('.result-panel');
-  const wasHidden = parentPanel && !parentPanel.classList.contains('active');
-  if (wasHidden) {
-    parentPanel.style.cssText = 'display:block !important; position:fixed; top:-99999px; left:0; width:900px; background:#fff; z-index:-1;';
-  }
-
-  await sleep(500);
-
-  // html2canvas로 캡처
-  const canvas = await html2canvas(sourceEl, {
+  // html2canvas 캡처
+  const canvas = await html2canvas(wrapper, {
     scale: 2,
     useCORS: true,
     backgroundColor: '#ffffff',
     logging: false,
-    windowWidth: 900
+    width: 860,
+    windowWidth: 960
   });
 
-  // 원상복구
-  if (wasHidden) {
-    parentPanel.style.cssText = '';
-  }
+  // 컨테이너 제거
+  document.body.removeChild(wrapper);
 
-  const imgData  = canvas.toDataURL('image/png');
-  const pdf      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW    = pdf.internal.pageSize.getWidth();
-  const pageH    = pdf.internal.pageSize.getHeight();
-  const margin   = 10;
-  const imgW     = pageW - margin * 2;
-  const imgH     = (canvas.height * imgW) / canvas.width;
-
-  let y = margin;
+  const imgData = canvas.toDataURL('image/png');
+  const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW   = pdf.internal.pageSize.getWidth();
+  const pageH   = pdf.internal.pageSize.getHeight();
+  const margin  = 10;
+  const imgW    = pageW - margin * 2;
+  const imgH    = (canvas.height * imgW) / canvas.width;
   const pageContentH = pageH - margin * 2;
 
   if (imgH <= pageContentH) {
-    pdf.addImage(imgData, 'PNG', margin, y, imgW, imgH);
+    pdf.addImage(imgData, 'PNG', margin, margin, imgW, imgH);
   } else {
-    // 여러 페이지로 분할
     let srcY = 0;
-    const ratio = canvas.width / imgW;  // px per mm
+    const ratio = canvas.width / imgW;
     while (srcY < canvas.height) {
       const sliceH = Math.min(pageContentH * ratio, canvas.height - srcY);
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width  = canvas.width;
       sliceCanvas.height = sliceH;
       sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      const sliceData = sliceCanvas.toDataURL('image/png');
-      pdf.addImage(sliceData, 'PNG', margin, margin, imgW, sliceH / ratio);
+      pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH / ratio);
       srcY += sliceH;
       if (srcY < canvas.height) pdf.addPage();
     }
