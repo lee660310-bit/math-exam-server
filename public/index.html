@@ -612,10 +612,10 @@ body {
     <textarea id="extras" placeholder="예: 4점짜리 킬러 문제 2개 포함, 교과서 예제 변형 위주..."></textarea>
   </div>
 
-  <!-- API 키 -->
+  <!-- 학원 비밀번호 -->
   <div class="form-group">
-    <label>🔑 Anthropic API 키</label>
-    <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+    <label>🔑 학원 접속 비밀번호</label>
+    <input type="password" id="apiKey" placeholder="비밀번호 입력" autocomplete="off">
   </div>
 
   <!-- 실행 버튼 -->
@@ -827,60 +827,44 @@ function copyPrompt() {
 // AI 호출
 // ─────────────────────────────────────────
 async function runAnalysis() {
-  const apiKey = document.getElementById('apiKey').value.trim();
-  if (!apiKey) { alert('API 키를 입력해주세요.'); return; }
+  const password = document.getElementById("apiKey").value.trim();
+  if (!password) { alert("학원 비밀번호를 입력해주세요."); return; }
 
   showLoading(true);
-  document.getElementById('runBtn').disabled = true;
+  document.getElementById("runBtn").disabled = true;
 
   try {
     const prompt = buildPrompt();
-    const messages = [];
+    let res;
 
     if (uploadedBase64 && uploadedFile) {
-      const isImage = uploadedFile.type.startsWith('image/');
-      const isPDF   = uploadedFile.type === 'application/pdf';
-      const content = [];
-
-      if (isImage) {
-        content.push({ type: 'image', source: { type: 'base64', media_type: uploadedFile.type, data: uploadedBase64 } });
-      } else if (isPDF) {
-        content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: uploadedBase64 } });
-      }
-      content.push({ type: 'text', text: '위 파일은 기출 시험지입니다. 출제 패턴을 분석한 후, 다음 지시에 따라 문제를 생성하세요.\n\n' + prompt });
-      messages.push({ role: 'user', content });
+      const formData = new FormData();
+      formData.append("password", password);
+      formData.append("prompt", "위 파일은 기출 시험지입니다. 출제 패턴을 분석한 후, 다음 지시에 따라 문제를 생성하세요.\n\n" + prompt);
+      formData.append("files", uploadedFile);
+      res = await fetch("/api/generate-with-files", { method: "POST", body: formData });
     } else {
-      messages.push({ role: 'user', content: prompt });
+      res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, prompt })
+      });
     }
-
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8000,
-        messages
-      })
-    });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+      throw new Error(err.error || "HTTP " + res.status);
     }
 
     const data = await res.json();
-    rawAIText = data.content.map(b => b.type === 'text' ? b.text : '').join('');
+    if (!data.ok) throw new Error(data.error || "알 수 없는 오류");
+    rawAIText = data.result;
 
     parseAndRender(rawAIText);
   } catch (e) {
     showLoading(false);
-    document.getElementById('runBtn').disabled = false;
-    showError('AI 호출 오류: ' + e.message);
+    document.getElementById("runBtn").disabled = false;
+    showError("AI 호출 오류: " + e.message);
   }
 }
 
