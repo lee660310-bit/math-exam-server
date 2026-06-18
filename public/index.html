@@ -726,6 +726,10 @@ body { font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-ser
 .choices { margin:8px 0 0 32px; display:grid; grid-template-columns:1fr 1fr; gap:4px 20px; font-size:13px; }
 .choice { padding:2px 0; }
 
+/* 2단 문제 레이아웃 */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:0 24px; }
+.two-col .q-block { break-inside:avoid; }
+
 /* 서술형 */
 .subj-block { border:1px solid #ddd; border-radius:6px; padding:12px 14px; background:#fafffe; }
 .subj-answer-space { margin-top:10px; min-height:80px; border-bottom:1px solid #bbb; }
@@ -836,7 +840,7 @@ function buildPrintPage(raw, info, today, isAnswer) {
         </ol>
       </div>
       ${mcSection}
-      ${buildExamSheet(raw, info, today)}
+      <div class="two-col">${buildExamSheet(raw, info, today)}</div>
       <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 무단 복제·배포·전송 금지 | 출제일: ${today}</div>
     </div>`;
   }
