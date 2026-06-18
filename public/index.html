@@ -124,6 +124,7 @@
         <button class="tab active" onclick="switchMode('analyze')">📊 기출 분석</button>
         <button class="tab" onclick="switchMode('generate')">✏️ 문제 생성</button>
         <button class="tab" onclick="switchMode('both')">🔄 분석+생성</button>
+        <button class="tab" onclick="switchMode('solution')">📋 해설지 생성</button>
       </div>
     </div>
     <div class="divider"></div>
@@ -283,10 +284,10 @@ document.querySelectorAll('.check-item').forEach(item => {
 function switchMode(m) {
   currentMode = m;
   document.querySelectorAll('.tab').forEach((t, i) =>
-    t.classList.toggle('active', ['analyze','generate','both'][i] === m));
-  document.getElementById('uploadSection').style.display = m === 'generate' ? 'none' : 'block';
-  document.getElementById('configSection').style.display = m === 'analyze' ? 'none' : 'block';
-  const labels = {analyze:'기출 분석 시작', generate:'문제 생성', both:'분석 후 문제 생성'};
+    t.classList.toggle('active', ['analyze','generate','both','solution'][i] === m));
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('configSection').style.display = (m === 'analyze' || m === 'solution') ? 'none' : 'block';
+  const labels = {analyze:'기출 분석 시작', generate:'문제 생성', both:'분석 후 문제 생성', solution:'해설지 생성'};
   document.getElementById('mainBtn').textContent = '🚀 ' + labels[m];
 }
 
@@ -381,7 +382,33 @@ ${info.extra ? '• 추가: '+info.extra : ''}
 지금 바로 생성해주세요.`;
   }
 
-  return `당신은 수학 내신 전문 출제 교사입니다.
+  if (currentMode === 'solution') {
+    return `당신은 수학 내신 전문 출제 교사입니다. 첨부된 시험지 PDF를 분석하여 완전한 해설지를 작성해주세요.
+
+[해설지 작성 지시사항]
+1. 모든 문항에 대해 정답과 단계별 풀이를 작성하세요
+2. 객관식은 정답 번호와 풀이 과정을 명확히
+3. 서술형은 채점기준표(부분점수 포함)를 반드시 작성
+4. 모든 수식은 LaTeX($...$, $$...$$)로 정확히 표기
+5. 오답 선지에 대한 간단한 해설도 포함
+
+[출력 형식 — 반드시 아래 구분자 사용]
+===ANSWER_START===
+▶ 1번 정답: ① [배점: OO점]
+[풀이]
+단계1: ...
+단계2: ...
+최종 답: ...
+
+▶ 2번 정답: ③ [배점: OO점]
+...
+(서술형은 채점기준표 포함)
+===ANSWER_END===
+
+지금 바로 해설지를 작성해주세요.`;
+  }
+
+  return \`당신은 수학 내신 전문 출제 교사입니다.
 [기본 정보]
 • 학교: ${info.school} ${info.grade} ${info.examType}
 • 과목: ${info.subject} / 범위: ${info.range}
@@ -417,6 +444,11 @@ async function runMain() {
   const info = getInfo();
   lastInfo = info;
   showLoading();
+
+  if (currentMode === 'solution' && uploadedFiles.length === 0) {
+    alert('해설지 생성을 위해 시험지 PDF를 업로드해주세요!');
+    return;
+  }
 
   try {
     let res;
@@ -561,6 +593,11 @@ function mdToHtml(text) {
 }
 
 function buildExamSheet(raw, info, today) {
+  // 구분자 및 마크다운 헤더 제거
+  raw = raw.replace(/===EXAM_START===|===EXAM_END===|===ANSWER_START===|===ANSWER_END===/g, '');
+  raw = raw.replace(/^#+\s*.+$/gm, '');
+  raw = raw.replace(/^---+$/gm, '');
+  raw = raw.replace(/^\*\*.*\*\*$/gm, '');
   const lines = raw.split('\n');
   let html = '';
   let i = 0;
@@ -626,6 +663,9 @@ function buildExamSheet(raw, info, today) {
 }
 
 function buildAnswerSheet(raw, info, today) {
+  // 구분자 제거
+  raw = raw.replace(/===EXAM_START===|===EXAM_END===|===ANSWER_START===|===ANSWER_END===/g, '');
+  raw = raw.replace(/^---+$/gm, '');
   // 마크다운 변환 후 해설 블록 파싱
   const lines = raw.split('\n');
   let html = '';
@@ -826,7 +866,7 @@ function buildPrintPage(raw, info, today, isAnswer) {
         <div class="exam-title">${info.grade} ${info.examType} | ${info.subject}</div>
       </div>
       <div class="info-row">
-        <div class="info-cell"><div class="label">시험일시</div>2025년 &nbsp;&nbsp; 월 &nbsp;&nbsp; 일</div>
+        <div class="info-cell"><div class="label">시험일시</div>${new Date().getFullYear()}년 &nbsp;&nbsp; 월 &nbsp;&nbsp; 일</div>
         <div class="info-cell"><div class="label">학년/반/번호</div>${info.grade} &nbsp;&nbsp; 반 &nbsp;&nbsp; 번</div>
         <div class="info-cell"><div class="label">이름 / 점수</div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; / ${total}점</div>
       </div>
