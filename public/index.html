@@ -4,1212 +4,617 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>수학 기출분석 & 문제 생성기</title>
-
-<!-- MathJax (수식 렌더링) -->
-<script>
-window.MathJax = {
-  tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] },
-  options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] },
-  startup: { typeset: false }
-};
-</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js"></script>
-
-<!-- jsPDF + html2canvas (PDF 생성) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <style>
-:root {
-  --ink:    #1a1a2e;
-  --sub:    #4a4a6a;
-  --rule:   #d0d0e0;
-  --paper:  #fafafa;
-  --white:  #ffffff;
-  --accent: #2563eb;
-  --accent2:#7c3aed;
-  --good:   #16a34a;
-  --warn:   #d97706;
-  --danger: #dc2626;
-  --sidebar-w: 320px;
-  --radius: 10px;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
-  background: var(--paper);
-  color: var(--ink);
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* ── 사이드바 ── */
-#sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
-  background: var(--white);
-  border-right: 1.5px solid var(--rule);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.sidebar-header {
-  padding: 20px 20px 14px;
-  border-bottom: 1px solid var(--rule);
-  background: linear-gradient(135deg, #1a1a2e 0%, #2563eb 100%);
-  color: #fff;
-}
-.sidebar-header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
-.sidebar-header p  { font-size: 11px; opacity: .7; margin-top: 3px; }
-
-.section-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--sub);
-  letter-spacing: .6px;
-  text-transform: uppercase;
-  padding: 14px 18px 6px;
-}
-
-/* 탭 버튼 */
-.tab-row {
-  display: flex;
-  gap: 6px;
-  padding: 0 18px 10px;
-}
-.tab-btn {
-  flex: 1;
-  padding: 7px 4px;
-  border: 1.5px solid var(--rule);
-  border-radius: 7px;
-  background: var(--paper);
-  font-size: 11.5px;
-  cursor: pointer;
-  color: var(--sub);
-  transition: all .15s;
-  text-align: center;
-}
-.tab-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-/* 폼 요소 공통 */
-.form-group { padding: 0 18px 10px; }
-.form-group label { display: block; font-size: 11.5px; color: var(--sub); margin-bottom: 5px; font-weight: 600; }
-.form-group select,
-.form-group input[type=text],
-.form-group textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1.5px solid var(--rule);
-  border-radius: 7px;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--white);
-  appearance: none;
-  outline: none;
-  transition: border-color .15s;
-}
-.form-group select:focus,
-.form-group input:focus,
-.form-group textarea:focus { border-color: var(--accent); }
-.form-group textarea { resize: vertical; min-height: 60px; font-size: 12px; }
-
-/* 숫자 입력 */
-.num-row { display: flex; gap: 8px; }
-.num-row .form-group { flex: 1; padding-left: 0; padding-right: 0; }
-.num-row .form-group:first-child { padding-left: 18px; }
-.num-row .form-group:last-child  { padding-right: 18px; }
-
-/* 체크박스 그리드 */
-.check-grid { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 10px; }
-.check-item { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-.check-item input { accent-color: var(--accent); width: 14px; height: 14px; }
-.check-item span { font-size: 12px; }
-
-/* 라디오 그리드 */
-.radio-grid { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 18px 10px; }
-.radio-item {
-  padding: 5px 10px;
-  border: 1.5px solid var(--rule);
-  border-radius: 20px;
-  font-size: 11.5px;
-  cursor: pointer;
-  color: var(--sub);
-  transition: all .15s;
-  white-space: nowrap;
-}
-.radio-item.active { background: var(--accent2); border-color: var(--accent2); color: #fff; font-weight: 600; }
-
-/* 업로드 존 */
-.upload-zone {
-  margin: 0 18px 10px;
-  border: 2px dashed var(--rule);
-  border-radius: var(--radius);
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color .15s, background .15s;
-  color: var(--sub);
-  font-size: 12px;
-}
-.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #eff6ff; }
-.upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
-.upload-zone strong { display: block; font-size: 12.5px; color: var(--ink); }
-#fileInput { display: none; }
-#fileName  { margin: 6px 18px 0; font-size: 11px; color: var(--good); }
-
-/* 버튼 */
-.btn-primary {
-  display: block;
-  width: calc(100% - 36px);
-  margin: 8px 18px;
-  padding: 11px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: .3px;
-  transition: opacity .15s;
-}
-.btn-primary:hover { opacity: .88; }
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-.btn-secondary {
-  display: block;
-  width: calc(100% - 36px);
-  margin: 4px 18px;
-  padding: 9px;
-  background: var(--paper);
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all .15s;
-  text-align: center;
-}
-.btn-secondary:hover { background: #eff6ff; }
-
-/* ── 메인 패널 ── */
-#main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* 툴바 */
-#toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 24px;
-  background: var(--white);
-  border-bottom: 1px solid var(--rule);
-  gap: 10px;
-}
-#toolbar-title { font-size: 14px; font-weight: 700; color: var(--ink); }
-#toolbar-status { font-size: 12px; color: var(--sub); }
-.toolbar-actions { display: flex; gap: 8px; }
-
-/* PDF 다운로드 버튼 */
-.pdf-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all .15s;
-}
-.pdf-btn:disabled { opacity: .4; cursor: not-allowed; }
-.pdf-btn.exam-btn  { background: var(--accent); color: #fff; }
-.pdf-btn.ans-btn   { background: var(--accent2); color: #fff; }
-.pdf-btn.both-btn  { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff; }
-.pdf-btn:not(:disabled):hover { filter: brightness(1.1); }
-
-/* 결과 영역 */
-#result-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  background: var(--paper);
-}
-
-/* 플레이스홀더 */
-#placeholder {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--sub);
-  gap: 12px;
-}
-#placeholder .big-icon { font-size: 56px; }
-#placeholder h2 { font-size: 18px; font-weight: 700; color: var(--ink); }
-#placeholder p  { font-size: 13px; text-align: center; line-height: 1.6; }
-.step-pills { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
-.step-pill {
-  background: var(--white);
-  border: 1px solid var(--rule);
-  border-radius: 20px;
-  padding: 6px 14px;
-  font-size: 12px;
-  color: var(--sub);
-}
-
-/* 로딩 */
-#loading {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 16px;
-  color: var(--sub);
-}
-.spinner {
-  width: 44px; height: 44px;
-  border: 4px solid var(--rule);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-#loading-msg { font-size: 14px; font-weight: 600; color: var(--ink); }
-#loading-sub { font-size: 12px; }
-
-/* 결과 카드 */
-#result-content { display: none; }
-
-.result-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 2px solid var(--rule);
-  padding-bottom: 0;
-}
-.result-tab {
-  padding: 8px 18px;
-  border: none;
-  background: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--sub);
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  transition: all .15s;
-}
-.result-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-.result-panel { display: none; }
-.result-panel.active { display: block; }
-
-/* 시험지/해설지 렌더 박스 */
-.exam-sheet {
-  background: var(--white);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 36px 48px;
-  max-width: 860px;
-  margin: 0 auto;
-  box-shadow: 0 2px 12px rgba(0,0,0,.06);
-  line-height: 1.7;
-}
-.exam-sheet h1 {
-  text-align: center;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  border-bottom: 2.5px solid var(--ink);
-  padding-bottom: 12px;
-  margin-bottom: 20px;
-}
-.exam-sheet .meta-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12.5px;
-  color: var(--sub);
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 10px;
-}
-.exam-sheet .q-block { margin-bottom: 22px; }
-.exam-sheet .q-num {
-  font-weight: 800;
-  color: var(--accent);
-  font-size: 14px;
-  display: inline-block;
-  min-width: 28px;
-}
-.exam-sheet .q-meta {
-  font-size: 11px;
-  color: var(--sub);
-  background: #f0f4ff;
-  border-radius: 4px;
-  padding: 1px 7px;
-  margin-left: 6px;
-}
-.exam-sheet .q-body { margin: 8px 0 8px 28px; font-size: 14px; }
-.exam-sheet .choices { margin: 6px 0 0 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
-.exam-sheet .choice { font-size: 13.5px; }
-.exam-sheet .subj-block { margin: 20px 0 0 28px; min-height: 60px; }
-
-/* 해설지 전용 */
-.ans-block { margin-bottom: 20px; border-left: 3px solid var(--accent); padding-left: 14px; }
-.ans-block .ans-label { font-weight: 800; font-size: 13px; color: var(--accent); margin-bottom: 4px; }
-.ans-block .ans-answer { font-size: 13.5px; font-weight: 700; color: var(--good); margin-bottom: 6px; }
-.ans-block .ans-explain { font-size: 13px; color: var(--ink); line-height: 1.75; }
-.ans-block .rubric-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
-.rubric-table th, .rubric-table td { border: 1px solid var(--rule); padding: 5px 10px; text-align: left; }
-.rubric-table th { background: #f5f7ff; font-weight: 600; }
-
-/* 숨겨진 PDF 렌더용 컨테이너 */
-#pdf-exam-render, #pdf-ans-render {
-  position: fixed;
-  top: -99999px;
-  left: -99999px;
-  width: 210mm;
-  background: white;
-  padding: 20mm 18mm;
-  font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
-  line-height: 1.7;
-  font-size: 13px;
-  color: #1a1a2e;
-}
-#pdf-exam-render h1, #pdf-ans-render h1 {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 800;
-  border-bottom: 2px solid #1a1a2e;
-  padding-bottom: 10px;
-  margin-bottom: 16px;
-}
-
-/* 오류 박스 */
-.error-box {
-  background: #fff0f0;
-  border: 1.5px solid var(--danger);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  color: var(--danger);
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-/* 원본 텍스트 뷰 */
-.raw-view {
-  background: #1a1a2e;
-  color: #e8f0ff;
-  border-radius: var(--radius);
-  padding: 20px 24px;
-  font-family: 'D2Coding', 'Courier New', monospace;
-  font-size: 12.5px;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-x: auto;
-}
-
-/* PDF 진행 오버레이 */
-#pdf-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.5);
-  z-index: 9999;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 16px;
-  color: #fff;
-}
-#pdf-overlay.show { display: flex; }
-#pdf-overlay .spinner { border-top-color: #fff; }
-#pdf-overlay p { font-size: 15px; font-weight: 600; }
-
-/* 반응형 */
-@media (max-width: 768px) {
-  :root { --sidebar-w: 100%; }
-  body { flex-direction: column; height: auto; overflow: auto; }
-  #sidebar { width: 100%; min-width: unset; max-height: 50vh; overflow-y: auto; }
-  #main { height: 60vh; }
-  .exam-sheet { padding: 20px 18px; }
-}
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap');
+  :root {
+    --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3354;
+    --accent:#4f8ef7;--accent2:#a78bfa;--accent3:#34d399;--warn:#f59e0b;
+    --danger:#ef4444;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+    --radius:12px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6;}
+  header{background:linear-gradient(135deg,#0f1117 0%,#1a1d27 50%,#1e1b3a 100%);border-bottom:1px solid var(--border);padding:20px 32px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+  .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:white;flex-shrink:0;}
+  header h1{font-size:18px;font-weight:700;}
+  header p{font-size:12px;color:var(--text3);}
+  .header-badge{margin-left:auto;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;}
+  .layout{display:grid;grid-template-columns:360px 1fr;min-height:calc(100vh - 85px);}
+  .left-panel{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px;}
+  .section-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+  .tabs{display:flex;background:var(--surface2);border-radius:var(--radius-sm);padding:4px;gap:2px;}
+  .tab{flex:1;padding:8px 6px;border:none;background:transparent;color:var(--text3);font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:all 0.2s;font-family:'Noto Sans KR',sans-serif;}
+  .tab.active{background:var(--accent);color:white;}
+  label{font-size:12px;color:var(--text2);font-weight:500;display:block;margin-bottom:6px;}
+  input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-family:'Noto Sans KR',sans-serif;padding:10px 12px;outline:none;transition:border-color 0.2s;}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+  select option{background:var(--surface2);}
+  textarea{resize:vertical;min-height:80px;}
+  .form-row{margin-bottom:14px;}
+  .form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface2);}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(79,142,247,0.05);}
+  .upload-icon{font-size:32px;margin-bottom:8px;}
+  .upload-zone p{font-size:12px;color:var(--text3);}
+  .upload-zone strong{color:var(--accent);}
+  #fileInput{display:none;}
+  .file-list{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+  .file-item{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:12px;}
+  .file-item .file-name{flex:1;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .file-item .remove-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;}
+  .num-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+  .num-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;}
+  .num-box label{font-size:10px;color:var(--text3);margin-bottom:4px;}
+  .num-box input{text-align:center;padding:4px;font-weight:700;font-size:16px;color:var(--accent);background:transparent;border:none;}
+  .check-group{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  .check-item{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;transition:all 0.2s;user-select:none;}
+  .check-item input{width:auto;display:none;}
+  .check-item.checked{background:rgba(79,142,247,0.15);border-color:var(--accent);color:var(--accent);}
+  .btn{width:100%;padding:14px;border:none;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;font-family:'Noto Sans KR',sans-serif;}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;}
+  .btn-primary:hover{opacity:0.9;transform:translateY(-1px);}
+  .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+  .btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border);margin-top:8px;}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .right-panel{background:var(--bg);overflow-y:auto;padding:32px;display:flex;flex-direction:column;gap:20px;}
+  .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;text-align:center;gap:16px;}
+  .welcome-icon{font-size:64px;}
+  .welcome h2{font-size:22px;font-weight:700;}
+  .welcome p{font-size:14px;color:var(--text3);max-width:420px;}
+  .flow-steps{display:flex;gap:12px;margin-top:8px;}
+  .flow-step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;text-align:center;font-size:12px;}
+  .flow-step .step-num{width:24px;height:24px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;margin:0 auto 8px;}
+  .loading-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;text-align:center;}
+  .spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-step{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text3);padding:4px 0;justify-content:center;}
+  .loading-step.active{color:var(--accent);}
+  .loading-step.done{color:var(--accent3);}
+  .result-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .result-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .result-header h3{font-size:15px;font-weight:700;flex:1;}
+  .result-body{padding:20px;font-size:13px;line-height:1.9;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+  .copy-btn{padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'Noto Sans KR',sans-serif;}
+  .copy-btn:hover{border-color:var(--accent3);color:var(--accent3);}
+  /* PDF 버튼 */
+  .pdf-btn{padding:8px 16px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all 0.2s;}
+  .pdf-btn:hover{filter:brightness(1.1);}
+  .pdf-exam{background:var(--accent);color:white;}
+  .pdf-ans{background:var(--accent2);color:white;}
+  .pdf-both{background:linear-gradient(90deg,var(--accent),var(--accent2));color:white;}
+  /* API bar */
+  .api-bar{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:12px;}
+  .api-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;}
+  .api-dot.ok{background:var(--accent3);}
+  .api-bar input{border:none;background:transparent;padding:0;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  .divider{height:1px;background:var(--border);}
+  .badge-purple{background:rgba(167,139,250,0.15);border:1px solid var(--accent2);color:var(--accent2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;}
+  .badge-green{background:rgba(52,211,153,0.15);border:1px solid var(--accent3);color:var(--accent3);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;}
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 </style>
 </head>
 <body>
+<header>
+  <div class="logo-icon">∑</div>
+  <div>
+    <h1>수학 기출분석 & 시험대비 문제 생성기</h1>
+    <p>리더스학원 전용 · 기출 업로드 → AI 분석 → 맞춤 문제 생성</p>
+  </div>
+  <span class="header-badge">AI Powered</span>
+</header>
 
-<!-- ══════════ 사이드바 ══════════ -->
-<aside id="sidebar">
-  <div class="sidebar-header">
-    <h1>∑ 수학 기출분석 & 문제 생성기</h1>
-    <p>리더스학원 전용 · AI 기반</p>
-  </div>
-
-  <!-- 작업 모드 -->
-  <div class="section-label">📋 작업 모드</div>
-  <div class="tab-row">
-    <button class="tab-btn active" data-mode="analysis" onclick="setMode(this,'analysis')">📊 기출 분석</button>
-    <button class="tab-btn" data-mode="generate" onclick="setMode(this,'generate')">✏️ 문제 생성</button>
-    <button class="tab-btn" data-mode="both" onclick="setMode(this,'both')">🔄 분석+생성</button>
-  </div>
-
-  <!-- 학교/범위 -->
-  <div class="section-label">🏫 학교 · 범위</div>
-  <div class="form-group">
-    <label>학교</label>
-    <select id="school">
-      <option value="심석고등학교">심석고등학교</option>
-      <option value="마석고등학교">마석고등학교</option>
-      <option value="심석중학교">심석중학교</option>
-      <option value="화도중학교">화도중학교</option>
-      <option value="직접입력">직접 입력</option>
-    </select>
-  </div>
-  <div class="form-group" id="schoolCustomGroup" style="display:none">
-    <label>학교명 직접 입력</label>
-    <input type="text" id="schoolCustom" placeholder="학교명 입력">
-  </div>
-  <div class="form-group">
-    <label>학년</label>
-    <select id="grade">
-      <option value="중1">중1</option>
-      <option value="중2">중2</option>
-      <option value="중3">중3</option>
-      <option value="고1" selected>고1</option>
-      <option value="고2">고2</option>
-      <option value="고3">고3</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>시험 종류</label>
-    <select id="examType">
-      <option>1학기 중간</option>
-      <option>1학기 기말</option>
-      <option>2학기 중간</option>
-      <option>2학기 기말</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>과목 <small style="color:var(--sub);font-weight:400">(2022 개정)</small></label>
-    <select id="subject">
-      <optgroup label="공통 (고1)">
-        <option>공통수학1</option>
-        <option>공통수학2</option>
-      </optgroup>
-      <optgroup label="일반 선택 (고2~3)">
-        <option>대수</option>
-        <option>미적분 I</option>
-        <option>확률과 통계</option>
-      </optgroup>
-      <optgroup label="진로 선택 (고2~3)">
-        <option>미적분 II</option>
-        <option>기하</option>
-        <option>경제 수학</option>
-        <option>인공지능 수학</option>
-      </optgroup>
-      <optgroup label="중학교">
-        <option>중학수학 1학년</option>
-        <option>중학수학 2학년</option>
-        <option>중학수학 3학년</option>
-      </optgroup>
-      <optgroup label="2015 개정 (고3)">
-        <option>수학 I</option>
-        <option>수학 II</option>
-        <option>미적분 (2015)</option>
-        <option>확률과 통계 (2015)</option>
-        <option>기하 (2015)</option>
-      </optgroup>
-    </select>
-  </div>
-  <div class="form-group">
-    <label>출제 범위</label>
-    <input type="text" id="range" placeholder="예: II.3 삼각함수 그래프 ~ III.2 수학적귀납법">
-  </div>
-
-  <!-- 파일 업로드 -->
-  <div class="section-label">📎 기출 파일 업로드</div>
-  <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-    <div class="icon">📄</div>
-    <strong>클릭하거나 드래그하세요</strong>
-    <span>PDF · JPG · PNG (최대 10MB)</span>
-  </div>
-  <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png">
-  <div id="fileName"></div>
-
-  <!-- 문제 구성 -->
-  <div class="section-label">⚙️ 문제 구성</div>
-  <div class="num-row">
-    <div class="form-group">
-      <label>객관식</label>
-      <input type="number" id="mcCount" value="15" min="0" max="30" style="width:100%">
-    </div>
-    <div class="form-group">
-      <label>서술형</label>
-      <input type="number" id="saCount" value="5" min="0" max="20" style="width:100%">
-    </div>
-    <div class="form-group">
-      <label>총점</label>
-      <input type="number" id="totalScore" value="100" min="10" max="200" style="width:100%">
-    </div>
-  </div>
-
-  <!-- 난이도 -->
-  <div class="section-label">📊 난이도</div>
-  <div class="radio-grid" id="diffGroup">
-    <div class="radio-item active" onclick="setRadio('diffGroup',this,'균형형')">균형형</div>
-    <div class="radio-item" onclick="setRadio('diffGroup',this,'고난도')">고난도</div>
-    <div class="radio-item" onclick="setRadio('diffGroup',this,'기본형')">기본형</div>
-    <div class="radio-item" onclick="setRadio('diffGroup',this,'내신 실전형')">내신 실전형</div>
-  </div>
-
-  <!-- 문제 유형 -->
-  <div class="section-label">📝 문제 유형</div>
-  <div class="check-grid">
-    <label class="check-item"><input type="checkbox" checked value="계산"><span>계산</span></label>
-    <label class="check-item"><input type="checkbox" checked value="개념이해"><span>개념이해</span></label>
-    <label class="check-item"><input type="checkbox" checked value="활용"><span>활용</span></label>
-    <label class="check-item"><input type="checkbox" value="그래프"><span>그래프</span></label>
-    <label class="check-item"><input type="checkbox" value="증명"><span>증명</span></label>
-    <label class="check-item"><input type="checkbox" value="창의"><span>창의</span></label>
-  </div>
-
-  <!-- 출판사 -->
-  <div class="form-group">
-    <label>출판사 <small style="color:var(--sub);font-weight:400">(선택)</small></label>
-    <select id="publisher">
-      <option value="">선택 안 함</option>
-      <option>미래엔</option>
-      <option>비상</option>
-      <option>천재교육</option>
-      <option>동아출판</option>
-      <option>좋은책신사고</option>
-    </select>
-  </div>
-
-  <!-- 추가 요구사항 -->
-  <div class="form-group">
-    <label>추가 요구사항</label>
-    <textarea id="extras" placeholder="예: 4점짜리 킬러 문제 2개 포함, 교과서 예제 변형 위주..."></textarea>
-  </div>
-
-  <!-- 학원 비밀번호 -->
-  <div class="form-group">
-    <label>🔑 학원 접속 비밀번호</label>
-    <input type="password" id="apiKey" placeholder="비밀번호 입력" autocomplete="off">
-  </div>
-
-  <!-- 실행 버튼 -->
-  <button class="btn-primary" id="runBtn" onclick="runAnalysis()">🚀 AI 분석 시작</button>
-  <button class="btn-secondary" onclick="copyPrompt()">📋 프롬프트만 복사</button>
-  <div style="height:20px"></div>
-</aside>
-
-<!-- ══════════ 메인 ══════════ -->
-<main id="main">
-  <!-- 툴바 -->
-  <div id="toolbar">
+<div class="layout">
+  <div class="left-panel">
+    <!-- 비밀번호 -->
     <div>
-      <div id="toolbar-title">📐 수학 기출분석 & 문제 생성 도구</div>
-      <div id="toolbar-status">왼쪽에서 설정하고 AI 분석을 시작하세요.</div>
+      <div class="section-title">🔑 학원 접속</div>
+      <div class="api-bar">
+        <div class="api-dot" id="apiDot"></div>
+        <input type="password" id="apiKey" placeholder="학원 비밀번호 입력" oninput="checkPw()">
+      </div>
     </div>
-    <div class="toolbar-actions">
-      <button class="pdf-btn exam-btn" id="btnExamPDF" onclick="downloadPDF('exam')" disabled>
-        📄 시험지 PDF
-      </button>
-      <button class="pdf-btn ans-btn" id="btnAnsPDF" onclick="downloadPDF('answer')" disabled>
-        📋 해설지 PDF
-      </button>
-      <button class="pdf-btn both-btn" id="btnBothPDF" onclick="downloadBothPDF()" disabled>
-        ⬇️ 둘 다 저장
-      </button>
+    <div class="divider"></div>
+    <!-- 모드 탭 -->
+    <div>
+      <div class="section-title">📋 작업 모드</div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchMode('analyze')">📊 기출 분석</button>
+        <button class="tab" onclick="switchMode('generate')">✏️ 문제 생성</button>
+        <button class="tab" onclick="switchMode('both')">🔄 분석+생성</button>
+      </div>
     </div>
+    <div class="divider"></div>
+    <!-- 학교/범위 -->
+    <div>
+      <div class="section-title">🏫 학교 · 범위 정보</div>
+      <div class="form-row">
+        <label>학교</label>
+        <select id="school" onchange="toggleCustom()">
+          <option value="심석고">심석고등학교</option>
+          <option value="마석고">마석고등학교</option>
+          <option value="심석중">심석중학교</option>
+          <option value="화도중">화도중학교</option>
+          <option value="직접입력">직접 입력</option>
+        </select>
+      </div>
+      <div class="form-row" id="customSchool" style="display:none">
+        <label>학교명 직접 입력</label>
+        <input type="text" id="schoolCustom" placeholder="학교명 입력">
+      </div>
+      <div class="form-row-2">
+        <div>
+          <label>학년</label>
+          <select id="grade">
+            <option>중1</option><option>중2</option><option>중3</option>
+            <option selected>고1</option><option>고2</option><option>고3</option>
+          </select>
+        </div>
+        <div>
+          <label>시험 종류</label>
+          <select id="examType">
+            <option>1학기 중간</option><option>1학기 기말</option>
+            <option>2학기 중간</option><option>2학기 기말</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>과목</label>
+        <select id="subject">
+          <optgroup label="공통 (고1)">
+            <option>공통수학1</option><option>공통수학2</option>
+          </optgroup>
+          <optgroup label="일반 선택 (고2~3)">
+            <option>대수</option><option>미적분 I</option><option>확률과 통계</option>
+          </optgroup>
+          <optgroup label="진로 선택 (고2~3)">
+            <option>미적분 II</option><option>기하</option><option>경제 수학</option>
+            <option>인공지능 수학</option>
+          </optgroup>
+          <optgroup label="중학교">
+            <option>중학수학 1학년</option><option>중학수학 2학년</option><option>중학수학 3학년</option>
+          </optgroup>
+          <optgroup label="2015 개정 (고3)">
+            <option>수학 I</option><option>수학 II</option><option>미적분 (2015)</option>
+            <option>확률과 통계 (2015)</option><option>기하 (2015)</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>출제 범위</label>
+        <input type="text" id="range" placeholder="예) 삼각함수, 수열, 수학적귀납법">
+      </div>
+    </div>
+    <div class="divider"></div>
+    <!-- 파일 업로드 -->
+    <div id="uploadSection">
+      <div class="section-title">📎 기출 파일 업로드</div>
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+           ondragover="handleDrag(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave()">
+        <div class="upload-icon">📄</div>
+        <p><strong>클릭하거나 드래그</strong>하세요</p>
+        <p>PDF · JPG · PNG 지원</p>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="handleFiles(this.files)">
+      <div class="file-list" id="fileList"></div>
+    </div>
+    <div class="divider"></div>
+    <!-- 문제 구성 -->
+    <div id="configSection" style="display:none">
+      <div class="section-title">⚙️ 문제 구성</div>
+      <div class="num-row">
+        <div class="num-box"><label>객관식</label><input type="number" id="mcCount" value="15" min="0" max="30"></div>
+        <div class="num-box"><label>서술형</label><input type="number" id="saCount" value="5" min="0" max="20"></div>
+        <div class="num-box"><label>총점</label><input type="number" id="totalScore" value="100" min="50" max="200"></div>
+      </div>
+      <div class="form-row">
+        <label>난이도</label>
+        <select id="difficulty">
+          <option>균형형 (하30% 중50% 상20%)</option>
+          <option>고난도 (1등급 변별)</option>
+          <option>기본형 (개념 확인 중심)</option>
+          <option>내신 실전형</option>
+        </select>
+      </div>
+      <label style="margin-bottom:8px">문제 유형</label>
+      <div class="check-group" id="typeGroup">
+        <label class="check-item checked"><input type="checkbox" value="계산" checked> 계산</label>
+        <label class="check-item checked"><input type="checkbox" value="개념이해" checked> 개념이해</label>
+        <label class="check-item checked"><input type="checkbox" value="활용·문장제" checked> 활용·문장제</label>
+        <label class="check-item"><input type="checkbox" value="그래프·도형"> 그래프·도형</label>
+        <label class="check-item"><input type="checkbox" value="증명"> 증명</label>
+        <label class="check-item"><input type="checkbox" value="창의·융합"> 창의·융합</label>
+      </div>
+      <div class="form-row">
+        <label>출판사 (선택)</label>
+        <input type="text" id="publisher" placeholder="예) 미래엔, 비상, 천재교육">
+      </div>
+      <div class="form-row">
+        <label>추가 요구사항</label>
+        <textarea id="extraReq" placeholder="예) 킬러 문제 2개, 교과서 예제 변형 위주" rows="3"></textarea>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="mainBtn" onclick="runMain()">🚀 AI 분석 시작</button>
+    <button class="btn btn-secondary" onclick="copyPrompt()">📋 프롬프트만 복사</button>
   </div>
 
-  <!-- 결과 영역 -->
-  <div id="result-area">
-    <!-- 플레이스홀더 -->
-    <div id="placeholder">
-      <div class="big-icon">📐</div>
+  <!-- 오른쪽 패널 -->
+  <div class="right-panel" id="rightPanel">
+    <div class="welcome" id="welcomeBox">
+      <div class="welcome-icon">📐</div>
       <h2>수학 기출분석 & 문제 생성 도구</h2>
-      <p>왼쪽에서 학교·범위를 입력하고 시작하세요.<br>기출 파일 업로드 시 출제 패턴까지 분석합니다.</p>
-      <div class="step-pills">
-        <div class="step-pill">① 학교·범위 입력</div>
-        <div class="step-pill">② 기출 파일 업로드</div>
-        <div class="step-pill">③ AI 분석·문제 생성</div>
-        <div class="step-pill">④ PDF 자동 다운로드</div>
-      </div>
-    </div>
-
-    <!-- 로딩 -->
-    <div id="loading">
-      <div class="spinner"></div>
-      <div id="loading-msg">AI가 문제를 생성하고 있습니다...</div>
-      <div id="loading-sub">수식 렌더링까지 잠시 기다려 주세요.</div>
-    </div>
-
-    <!-- 결과 -->
-    <div id="result-content">
-      <div class="result-tabs">
-        <button class="result-tab active" onclick="switchResultTab(this,'tab-exam')">📄 시험지</button>
-        <button class="result-tab" onclick="switchResultTab(this,'tab-answer')">📋 해설지</button>
-        <button class="result-tab" onclick="switchResultTab(this,'tab-raw')">🔤 원본 텍스트</button>
-      </div>
-
-      <div id="tab-exam" class="result-panel active">
-        <div class="exam-sheet" id="examSheetRender"></div>
-      </div>
-      <div id="tab-answer" class="result-panel">
-        <div class="exam-sheet" id="ansSheetRender"></div>
-      </div>
-      <div id="tab-raw" class="result-panel">
-        <div class="raw-view" id="rawText"></div>
+      <p>왼쪽 패널에서 학교·범위를 입력하고 시작하세요.<br>비밀번호 입력 후 AI 분석 시작을 누르세요.</p>
+      <div class="flow-steps">
+        <div class="flow-step"><div class="step-num">1</div>학교·범위<br>입력</div>
+        <div class="flow-step"><div class="step-num">2</div>기출 파일<br>업로드</div>
+        <div class="flow-step"><div class="step-num">3</div>AI 분석·<br>문제 생성</div>
+        <div class="flow-step"><div class="step-num">4</div>PDF<br>다운로드</div>
       </div>
     </div>
   </div>
-</main>
-
-<!-- PDF 렌더용 숨김 컨테이너 -->
-<div id="pdf-exam-render"></div>
-<div id="pdf-ans-render"></div>
-
-<!-- PDF 생성 오버레이 -->
-<div id="pdf-overlay">
-  <div class="spinner"></div>
-  <p id="pdf-overlay-msg">PDF 생성 중...</p>
 </div>
 
 <script>
-// ─────────────────────────────────────────
-// 상태
-// ─────────────────────────────────────────
-let currentMode = 'analysis';
-let currentDiff = '균형형';
-let rawAIText   = '';
-let examHTML    = '';
-let ansHTML     = '';
-let uploadedFile = null;
-let uploadedBase64 = null;
+let currentMode = 'analyze';
+let uploadedFiles = [];
+let lastResult = '';
+let lastInfo = {};
 
-// ─────────────────────────────────────────
-// UI 헬퍼
-// ─────────────────────────────────────────
-function setMode(el, mode) {
-  currentMode = mode;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-}
-function setRadio(groupId, el, val) {
-  currentDiff = val;
-  document.querySelectorAll(`#${groupId} .radio-item`).forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-}
-function switchResultTab(el, panelId) {
-  document.querySelectorAll('.result-tab').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.result-panel').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById(panelId).classList.add('active');
+function checkPw() {
+  const v = document.getElementById('apiKey').value.trim();
+  document.getElementById('apiDot').classList.toggle('ok', v.length > 3);
 }
 
-// 학교 직접입력 토글
-document.getElementById('school').addEventListener('change', function() {
-  document.getElementById('schoolCustomGroup').style.display = this.value === '직접입력' ? '' : 'none';
+function toggleCustom() {
+  document.getElementById('customSchool').style.display =
+    document.getElementById('school').value === '직접입력' ? 'block' : 'none';
+}
+
+document.querySelectorAll('.check-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const cb = item.querySelector('input');
+    cb.checked = !cb.checked;
+    item.classList.toggle('checked', cb.checked);
+  });
 });
 
-// 파일 업로드
-document.getElementById('fileInput').addEventListener('change', handleFile);
-const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.classList.remove('drag');
-  if (e.dataTransfer.files.length) { document.getElementById('fileInput').files = e.dataTransfer.files; handleFile(); }
-});
-
-function handleFile() {
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) return;
-  if (file.size > 10 * 1024 * 1024) { alert('파일이 10MB를 초과합니다.'); return; }
-  uploadedFile = file;
-  document.getElementById('fileName').textContent = '✅ ' + file.name;
-  const reader = new FileReader();
-  reader.onload = e => { uploadedBase64 = e.target.result.split(',')[1]; };
-  reader.readAsDataURL(file);
+function switchMode(m) {
+  currentMode = m;
+  document.querySelectorAll('.tab').forEach((t, i) =>
+    t.classList.toggle('active', ['analyze','generate','both'][i] === m));
+  document.getElementById('uploadSection').style.display = m === 'generate' ? 'none' : 'block';
+  document.getElementById('configSection').style.display = m === 'analyze' ? 'none' : 'block';
+  const labels = {analyze:'기출 분석 시작', generate:'문제 생성', both:'분석 후 문제 생성'};
+  document.getElementById('mainBtn').textContent = '🚀 ' + labels[m];
 }
 
-// ─────────────────────────────────────────
-// 프롬프트 생성
-// ─────────────────────────────────────────
-function buildPrompt() {
-  const school    = document.getElementById('school').value === '직접입력'
-                  ? document.getElementById('schoolCustom').value
-                  : document.getElementById('school').value;
-  const grade     = document.getElementById('grade').value;
-  const examType  = document.getElementById('examType').value;
-  const subject   = document.getElementById('subject').value;
-  const range     = document.getElementById('range').value || '전 범위';
-  const mc        = document.getElementById('mcCount').value;
-  const sa        = document.getElementById('saCount').value;
-  const total     = document.getElementById('totalScore').value;
-  const publisher = document.getElementById('publisher').value;
-  const extras    = document.getElementById('extras').value;
-  const types     = [...document.querySelectorAll('.check-grid input:checked')].map(c => c.value).join(', ');
+function handleDrag(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag'); }
+function handleDragLeave() { document.getElementById('uploadZone').classList.remove('drag'); }
+function handleDrop(e) {
+  e.preventDefault(); document.getElementById('uploadZone').classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+}
+function handleFiles(files) {
+  [...files].forEach(f => { if (!uploadedFiles.find(x=>x.name===f.name)) uploadedFiles.push(f); });
+  renderFileList();
+}
+function renderFileList() {
+  document.getElementById('fileList').innerHTML = uploadedFiles.map((f,i) => `
+    <div class="file-item">
+      <span>${f.type.includes('pdf')? '📄':'🖼️'}</span>
+      <span class="file-name">${f.name}</span>
+      <button class="remove-btn" onclick="removeFile(${i})">✕</button>
+    </div>`).join('');
+}
+function removeFile(i) { uploadedFiles.splice(i,1); renderFileList(); }
 
-  const modeLabel = { analysis: '기출 분석', generate: '문제 생성', both: '기출 분석 + 문제 생성' }[currentMode];
+function getInfo() {
+  const school = document.getElementById('school').value === '직접입력'
+    ? document.getElementById('schoolCustom').value
+    : document.getElementById('school').value;
+  return {
+    school, grade: document.getElementById('grade').value,
+    examType: document.getElementById('examType').value,
+    subject: document.getElementById('subject').value,
+    range: document.getElementById('range').value || '전 범위',
+    mc: document.getElementById('mcCount').value,
+    sa: document.getElementById('saCount').value,
+    total: document.getElementById('totalScore').value,
+    diff: document.getElementById('difficulty').value,
+    types: [...document.querySelectorAll('.check-item.checked input')].map(x=>x.value).join(', '),
+    publisher: document.getElementById('publisher').value,
+    extra: document.getElementById('extraReq').value
+  };
+}
 
-  return `당신은 수학 내신 전문 출제 교사입니다. 아래 조건에 맞게 ${modeLabel}을 수행하세요.
+function buildPrompt(info) {
+  const fileNote = uploadedFiles.length
+    ? `\n첨부 기출 파일: ${uploadedFiles.map(f=>f.name).join(', ')}\n기출 파일을 분석하여 출제 유형·배점 패턴을 정리해주세요.\n` : '';
 
+  if (currentMode === 'analyze') {
+    return `당신은 수학 내신 전문 출제 분석가입니다.
+[분석 대상]
+• 학교: ${info.school} ${info.grade} / 시험: ${info.examType} / 과목: ${info.subject}
+• 범위: ${info.range}
+${fileNote}
+다음을 분석해주세요:
+1. 출제 유형 분석표 (문항번호|유형|배점|난이도|핵심개념)
+2. 배점 구조 분석
+3. 자주 출제 핵심 개념 TOP 5
+4. 서술형 출제 형식 분석
+5. 시험대비 전략
+모든 수식은 LaTeX($...$)으로 표기해주세요.`;
+  }
+
+  if (currentMode === 'generate') {
+    return `당신은 수학 내신 전문 출제 교사입니다.
 [시험 정보]
-• 학교: ${school} ${grade} ${examType}
-• 과목: ${subject}
-• 범위: ${range}
-${publisher ? `• 출판사: ${publisher}` : ''}
-
+• 학교: ${info.school} ${info.grade} ${info.examType}
+• 과목: ${info.subject} / 범위: ${info.range}
+${info.publisher ? '• 교과서: '+info.publisher : ''}
 [문제 구성]
-• 객관식 ${mc}문항 + 서술형 ${sa}문항 = 총 ${total}점
-• 난이도: ${currentDiff}
-• 문제 유형: ${types || '계산, 개념이해, 활용'}
-${extras ? `• 추가 요구사항: ${extras}` : ''}
-
+• 객관식 ${info.mc}문항 + 서술형 ${info.sa}문항 = 총 ${info.total}점
+• 난이도: ${info.diff}
+• 문제 유형: ${info.types}
+${info.extra ? '• 추가: '+info.extra : ''}
 [필수 지시사항]
 1. 모든 수식은 반드시 LaTeX($...$, $$...$$)로 정확히 표기
-2. 분수·지수·근호·삼각함수가 깨지지 않게 할 것
-3. 문제 출제 후 반드시 직접 검산하여 답이 정수 또는 유리수로 떨어지도록 숫자 조정
+2. 분수·지수·근호·삼각함수 깨지지 않게 할 것
+3. 문제 출제 후 반드시 검산하여 답이 정수 또는 유리수로 떨어지도록 숫자 조정
 4. 각 문항에 [배점], [유형], [난이도] 포함
 5. 서술형은 채점기준표(부분점수 포함) 별도 작성
-
-[출력 형식 - 반드시 아래 구분자를 정확히 사용]
-시험지 파트:
+[출력 형식 — 반드시 아래 구분자 사용]
 ===EXAM_START===
 ▣ 1. (객관식) [배점: OO점] [유형: OO] [난이도: 하/중/상]
 문제 내용...
-① ② ③ ④ ⑤ 선지
-(서술형은 ▣ (서술형) [배점: OO점] 형식)
+① ② ③ ④ ⑤
 ===EXAM_END===
-
-해설지 파트:
 ===ANSWER_START===
 ▶ 1번 정답: OO [배점: OO점]
 [풀이]
 단계1: ...
 단계2: ...
 최종 답: ...
-(서술형은 채점기준표 포함)
 ===ANSWER_END===
+지금 바로 생성해주세요.`;
+  }
 
-지금 바로 시작하세요.`;
+  return `당신은 수학 내신 전문 출제 교사입니다.
+[기본 정보]
+• 학교: ${info.school} ${info.grade} ${info.examType}
+• 과목: ${info.subject} / 범위: ${info.range}
+${fileNote}
+━━ STEP 1: 기출 분석 ━━
+출제 유형·배점·핵심 개념 간략 정리
+━━ STEP 2: 문제 생성 ━━
+• 객관식 ${info.mc}문항 + 서술형 ${info.sa}문항 = 총 ${info.total}점
+• 난이도: ${info.diff} / 유형: ${info.types}
+${info.extra ? '• 추가: '+info.extra : ''}
+[필수] 수식 LaTeX 표기, 검산 필수, 채점기준표 포함
+[출력 형식 — 반드시 아래 구분자 사용]
+===EXAM_START===
+(시험지 내용)
+===EXAM_END===
+===ANSWER_START===
+(해설지 내용)
+===ANSWER_END===
+지금 바로 생성해주세요.`;
 }
 
-function copyPrompt() {
-  navigator.clipboard.writeText(buildPrompt()).then(() => alert('프롬프트가 복사되었습니다!\nClaude.ai 등에 붙여넣어 사용하세요.'));
+async function copyPrompt() {
+  const info = getInfo();
+  const prompt = buildPrompt(info);
+  await navigator.clipboard.writeText(prompt).catch(()=>{});
+  alert('프롬프트가 복사되었습니다!\nClaude.ai에 붙여넣기 하세요.');
 }
 
-// ─────────────────────────────────────────
-// AI 호출
-// ─────────────────────────────────────────
-async function runAnalysis() {
-  const password = document.getElementById("apiKey").value.trim();
-  if (!password) { alert("학원 비밀번호를 입력해주세요."); return; }
+async function runMain() {
+  const password = document.getElementById('apiKey').value.trim();
+  if (!password) { alert('학원 비밀번호를 입력해주세요.'); return; }
 
-  showLoading(true);
-  document.getElementById("runBtn").disabled = true;
+  const info = getInfo();
+  lastInfo = info;
+  showLoading();
 
   try {
-    const prompt = buildPrompt();
     let res;
-
-    if (uploadedBase64 && uploadedFile) {
+    if (uploadedFiles.length > 0) {
       const formData = new FormData();
-      formData.append("password", password);
-      formData.append("prompt", "위 파일은 기출 시험지입니다. 출제 패턴을 분석한 후, 다음 지시에 따라 문제를 생성하세요.\n\n" + prompt);
-      formData.append("files", uploadedFile);
-      res = await fetch("/api/generate-with-files", { method: "POST", body: formData });
+      formData.append('password', password);
+      formData.append('prompt', buildPrompt(info));
+      uploadedFiles.forEach(f => formData.append('files', f));
+      res = await fetch('/api/generate-with-files', { method:'POST', body: formData });
     } else {
-      res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, prompt })
+      res = await fetch('/api/generate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ password, prompt: buildPrompt(info) })
       });
     }
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "HTTP " + res.status);
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.error || 'HTTP ' + res.status);
     }
-
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "알 수 없는 오류");
-    rawAIText = data.result;
-
-    parseAndRender(rawAIText);
-  } catch (e) {
-    showLoading(false);
-    document.getElementById("runBtn").disabled = false;
-    showError("AI 호출 오류: " + e.message);
+    if (!data.ok) throw new Error(data.error || '알 수 없는 오류');
+    lastResult = data.result;
+    showResult(data.result, info);
+  } catch(e) {
+    showError(e.message);
   }
 }
 
-// ─────────────────────────────────────────
-// 파싱 & 렌더링
-// ─────────────────────────────────────────
-function parseAndRender(text) {
-  // 구분자로 파싱
+function showLoading() {
+  const steps = currentMode === 'analyze'
+    ? ['기출 파일 분석 중...','출제 패턴 추출 중...','유형·배점 분류 중...','분석 리포트 생성 중...']
+    : ['범위 파악 중...','문제 초안 생성 중...','검산 및 숫자 조정 중...','해설·채점기준표 작성 중...'];
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p style="font-size:15px;font-weight:700;margin-bottom:16px;">AI가 처리 중입니다...</p>
+      ${steps.map((s,i)=>`<div class="loading-step ${i===0?'active':''}" id="ls${i}">● ${s}</div>`).join('')}
+    </div>`;
+  let cur=0;
+  const iv = setInterval(()=>{
+    document.getElementById(`ls${cur}`)?.classList.replace('active','done');
+    cur++;
+    if(cur<steps.length) document.getElementById(`ls${cur}`)?.classList.add('active');
+    else clearInterval(iv);
+  },1800);
+}
+
+function showResult(text, info) {
   const examMatch = text.match(/===EXAM_START===([\s\S]*?)===EXAM_END===/);
   const ansMatch  = text.match(/===ANSWER_START===([\s\S]*?)===ANSWER_END===/);
+  const hasExam = !!examMatch;
 
+  const btnRow = hasExam ? `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+      <button class="pdf-btn pdf-exam" onclick="printPDF('exam')">📄 시험지 PDF</button>
+      <button class="pdf-btn pdf-ans" onclick="printPDF('answer')">📋 해설지 PDF</button>
+      <button class="pdf-btn pdf-both" onclick="printPDF('both')">⬇️ 둘 다 저장</button>
+      <button class="copy-btn" onclick="copyResult()">📋 전체 복사</button>
+    </div>` : `
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="copy-btn" onclick="copyResult()">📋 전체 복사</button>
+      <button class="copy-btn" onclick="printPDF('all')">🖨️ 인쇄</button>
+    </div>`;
+
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="result-card">
+      <div class="result-header">
+        <span>📐</span>
+        <h3>${info.school} ${info.grade} ${info.examType} · ${info.subject}</h3>
+        <span class="badge-purple">${info.range}</span>
+      </div>
+      ${btnRow}
+      <div class="result-body" id="resultBody">${escHtml(text)}</div>
+    </div>`;
+
+  if(window.MathJax) MathJax.typesetPromise([document.getElementById('resultBody')]).catch(()=>{});
+}
+
+function escHtml(t){
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyResult(){
+  const t=document.getElementById('resultBody');
+  navigator.clipboard.writeText(t?t.innerText:'').then(()=>alert('복사되었습니다!'));
+}
+
+function showError(msg){
+  document.getElementById('rightPanel').innerHTML=`
+    <div class="result-card">
+      <div class="result-header"><span>⚠️</span><h3>오류 발생</h3></div>
+      <div class="result-body" style="color:var(--danger)">${msg}\n\n비밀번호를 확인하거나 프롬프트 복사 모드를 사용해주세요.</div>
+    </div>
+    <button class="btn btn-secondary" style="width:200px;padding:10px" onclick="copyPrompt()">📋 프롬프트 복사 모드</button>`;
+}
+
+// ── PDF 인쇄 (window.print 방식) ──
+function printPDF(type) {
+  const text = lastResult;
+  const info = lastInfo;
+  const today = new Date().toLocaleDateString('ko-KR');
+
+  const examMatch = text.match(/===EXAM_START===([\s\S]*?)===EXAM_END===/);
+  const ansMatch  = text.match(/===ANSWER_START===([\s\S]*?)===ANSWER_END===/);
   const examRaw = examMatch ? examMatch[1].trim() : text;
-  const ansRaw  = ansMatch  ? ansMatch[1].trim()  : '';
+  const ansRaw  = ansMatch  ? ansMatch[1].trim()  : text;
 
-  // 메타 정보
-  const school   = document.getElementById('school').value === '직접입력' ? document.getElementById('schoolCustom').value : document.getElementById('school').value;
-  const grade    = document.getElementById('grade').value;
-  const examType = document.getElementById('examType').value;
-  const subject  = document.getElementById('subject').value;
-  const mc       = document.getElementById('mcCount').value;
-  const sa       = document.getElementById('saCount').value;
-  const total    = document.getElementById('totalScore').value;
-  const today    = new Date().toLocaleDateString('ko-KR');
-
-  // 시험지 HTML 생성
-  examHTML = buildExamHTML(examRaw, { school, grade, examType, subject, mc, sa, total, today });
-  // 해설지 HTML 생성
-  ansHTML  = buildAnswerHTML(ansRaw || examRaw, { school, grade, examType, subject, today });
-
-  // 렌더
-  document.getElementById('examSheetRender').innerHTML = examHTML;
-  document.getElementById('ansSheetRender').innerHTML  = ansHTML;
-  document.getElementById('rawText').textContent = text;
-
-  // MathJax 렌더링
-  if (window.MathJax) {
-    MathJax.typesetPromise([document.getElementById('examSheetRender'), document.getElementById('ansSheetRender')]).then(() => {
-      showLoading(false);
-      document.getElementById('runBtn').disabled = false;
-      showResult();
-      enablePDFButtons();
-    }).catch(err => {
-      showLoading(false);
-      document.getElementById('runBtn').disabled = false;
-      showResult();
-      enablePDFButtons();
-    });
-  } else {
-    showLoading(false);
-    document.getElementById('runBtn').disabled = false;
-    showResult();
-    enablePDFButtons();
-  }
-}
-
-function buildExamHTML(raw, meta) {
-  return `
-    <h1>📐 ${meta.subject} 시험지</h1>
-    <div class="meta-row">
-      <span>학교: ${meta.school} ${meta.grade} | 시험: ${meta.examType}</span>
-      <span>객관식 ${meta.mc}문항 + 서술형 ${meta.sa}문항 = ${meta.total}점</span>
-      <span>출제일: ${meta.today}</span>
-    </div>
-    <div class="exam-body">${formatExamText(raw)}</div>
-  `;
-}
-
-function buildAnswerHTML(raw, meta) {
-  return `
-    <h1>📋 ${meta.subject} 해설지 (교사용)</h1>
-    <div class="meta-row">
-      <span>학교: ${meta.school} ${meta.grade} | 시험: ${meta.examType}</span>
-      <span>출제일: ${meta.today}</span>
-      <span style="color:var(--danger);font-weight:600">⚠️ 학생 배포 금지</span>
-    </div>
-    <div class="ans-body">${formatAnswerText(raw)}</div>
-  `;
-}
-
-// 시험지 텍스트 포매팅
-function formatExamText(text) {
   let html = '';
-  const lines = text.split('\n');
-  let inChoices = false;
-  let choicesArr = [];
-
-  function flushChoices() {
-    if (choicesArr.length) {
-      html += `<div class="choices">${choicesArr.map(c => `<div class="choice">${escapeHtml(c)}</div>`).join('')}</div>`;
-      choicesArr = [];
-      inChoices = false;
-    }
+  if (type === 'exam' || type === 'both') {
+    html += buildPrintHTML(examRaw, info, today, false);
+  }
+  if (type === 'both') {
+    html += '<div style="page-break-before:always"></div>';
+  }
+  if (type === 'answer' || type === 'both') {
+    html += buildPrintHTML(ansRaw, info, today, true);
+  }
+  if (type === 'all') {
+    html += buildPrintHTML(text, info, today, false);
   }
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) { flushChoices(); html += '<br>'; continue; }
-
-    // 문제 번호 라인
-    if (/^▣\s*\d+\./.test(trimmed) || /^▣\s*\(서술형\)/.test(trimmed)) {
-      flushChoices();
-      const metaMatch = trimmed.match(/\[배점[:\s]*([^\]]+)\]|\[유형[:\s]*([^\]]+)\]|\[난이도[:\s]*([^\]]+)\]/g);
-      const metaTags = metaMatch ? metaMatch.map(m => `<span class="q-meta">${m.replace(/[\[\]]/g,'')}</span>`).join('') : '';
-      const cleanLine = trimmed.replace(/\[배점[^\]]*\]|\[유형[^\]]*\]|\[난이도[^\]]*\]/g,'').trim();
-      html += `<div class="q-block"><div><span class="q-num">${cleanLine.replace(/^▣\s*/,'').replace(/\s.*/,'')}</span> ${metaTags}</div>`;
-      const body = cleanLine.replace(/^▣\s*[\d]+\.\s*|\(서술형\)\s*/,'').trim();
-      if (body) html += `<div class="q-body">${processLatex(body)}</div>`;
-    }
-    // 선택지
-    else if (/^[①②③④⑤]/.test(trimmed)) {
-      inChoices = true;
-      choicesArr.push(trimmed);
-      if (choicesArr.length === 5) { html += `<div class="choices">${choicesArr.map(c => `<div class="choice">${processLatex(c)}</div>`).join('')}</div>`; choicesArr = []; inChoices = false; }
-    }
-    // 서술형 답안칸
-    else if (/^[\s]*답:/.test(trimmed) || /^\[풀이\]/.test(trimmed)) {
-      flushChoices();
-      html += `<div class="subj-block"><strong>${processLatex(trimmed)}</strong><br><div style="min-height:80px;border-bottom:1px solid var(--rule);margin-top:8px"></div></div>`;
-    }
-    else {
-      if (inChoices) { flushChoices(); }
-      html += `<div class="q-body" style="margin-left:0">${processLatex(trimmed)}</div>`;
-    }
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']], displayMath: [['$$','$$'],['\\\\[','\\\\]']] },
+  startup: { typeset: false }
+};
+<\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js"><\/script>
+<style>
+  body { font-family: 'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif; padding:0; margin:0; font-size:13px; color:#111; line-height:1.8; }
+  .page { padding:20mm 18mm; max-width:210mm; margin:0 auto; }
+  h1 { font-size:18px; font-weight:900; text-align:center; border-bottom:2.5px solid #111; padding-bottom:10px; margin-bottom:16px; }
+  .meta { display:flex; justify-content:space-between; font-size:11.5px; color:#555; border-bottom:1px solid #ddd; padding-bottom:8px; margin-bottom:18px; }
+  .q-block { margin-bottom:20px; }
+  .q-num { font-weight:800; color:#2563eb; display:inline-block; min-width:26px; }
+  .q-meta { font-size:10px; background:#f0f4ff; border-radius:3px; padding:1px 6px; margin-left:4px; color:#555; }
+  .q-body { margin:6px 0 6px 26px; }
+  .choices { margin:6px 0 0 26px; display:grid; grid-template-columns:1fr 1fr; gap:3px 14px; font-size:12.5px; }
+  .ans-block { border-left:3px solid #2563eb; padding-left:12px; margin-bottom:18px; }
+  .ans-label { font-weight:800; color:#2563eb; font-size:12.5px; }
+  .ans-answer { color:#16a34a; font-weight:700; margin:4px 0; }
+  .ans-explain { font-size:12.5px; }
+  .footer { text-align:center; font-size:10px; color:#999; margin-top:30px; border-top:1px solid #eee; padding-top:10px; }
+  .teacher-only { color:#dc2626; font-weight:700; }
+  @media print {
+    @page { margin:15mm; size:A4; }
+    body { font-size:12px; }
+    .no-print { display:none; }
   }
-  flushChoices();
-  // 미닫힌 q-block 닫기
-  const openBlocks = (html.match(/<div class="q-block">/g) || []).length;
-  const closeBlocks = (html.match(/<\/div><\/div>/g) || []).length;
-  for (let i = 0; i < openBlocks - closeBlocks; i++) html += '</div>';
-  return html;
-}
-
-// 해설지 텍스트 포매팅
-function formatAnswerText(text) {
-  let html = '';
-  const lines = text.split('\n');
-  let inBlock = false;
-  let blockContent = '';
-  let blockLabel = '';
-
-  function flushBlock() {
-    if (blockLabel) {
-      html += `<div class="ans-block">
-        <div class="ans-label">${escapeHtml(blockLabel)}</div>
-        <div class="ans-explain">${processLatex(blockContent.trim())}</div>
-      </div>`;
-      blockLabel = ''; blockContent = ''; inBlock = false;
-    }
-  }
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) { if (inBlock) blockContent += '\n'; continue; }
-
-    if (/^▶\s*\d+번/.test(trimmed)) {
-      flushBlock();
-      const answerLine = trimmed.match(/정답[:\s]*(.+)/);
-      const ans = answerLine ? `<div class="ans-answer">✅ 정답: ${processLatex(answerLine[1])}</div>` : '';
-      blockLabel = trimmed.replace(/정답.*/, '').trim();
-      blockContent = ans;
-      inBlock = true;
-    } else if (inBlock) {
-      blockContent += '\n' + trimmed;
+  table { border-collapse:collapse; width:100%; margin:8px 0; font-size:12px; }
+  th,td { border:1px solid #ddd; padding:5px 8px; }
+  th { background:#f5f7ff; font-weight:600; }
+</style>
+</head><body>
+${html}
+<script>
+  window.onload = function() {
+    if(window.MathJax) {
+      MathJax.startup.promise.then(function(){
+        MathJax.typesetPromise().then(function(){
+          setTimeout(function(){ window.print(); }, 500);
+        });
+      });
     } else {
-      html += `<p style="font-size:13px;margin-bottom:6px">${processLatex(trimmed)}</p>`;
+      setTimeout(function(){ window.print(); }, 1000);
     }
-  }
-  flushBlock();
-  return html || `<p style="color:var(--sub);font-size:13px">해설지 구분자(===ANSWER_START===)가 없습니다. 원본 텍스트 탭을 확인하세요.</p>`;
+  };
+<\/script>
+</body></html>`);
+  w.document.close();
 }
 
-// LaTeX 보호 처리
-function processLatex(text) {
-  // HTML 이스케이프 ($ 밖 부분만)
-  let result = '';
-  let i = 0;
-  const safe = text;
-  // 간단히: $ 포함 구간은 그대로, 나머지는 이스케이프
-  const parts = safe.split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g);
-  return parts.map((p, idx) => {
-    if (idx % 2 === 1) return p; // LaTeX 구간 그대로
-    return escapeHtml(p);
-  }).join('');
+function buildPrintHTML(raw, info, today, isAnswer) {
+  const title = isAnswer
+    ? `${info.subject} 해설지 (교사용)`
+    : `${info.subject} 시험지`;
+  const teacherNote = isAnswer
+    ? `<span class="teacher-only">⚠️ 학생 배포 금지</span>` : '';
+
+  return `<div class="page">
+    <h1>📐 ${title}</h1>
+    <div class="meta">
+      <span>${info.school} ${info.grade} | ${info.examType}</span>
+      ${!isAnswer ? `<span>객관식 ${info.mc}문항 + 서술형 ${info.sa}문항 = ${info.total}점</span>` : ''}
+      <span>${today} ${teacherNote}</span>
+    </div>
+    <div class="content">${raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    <div class="footer">© 리더스학원 | 심석중·고 맞은편 2층 ☎ 031-511-0984 | 본 시험지의 저작권은 리더스학원에 있습니다.</div>
+  </div>`;
 }
 
-function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ─────────────────────────────────────────
-// UI 상태 전환
-// ─────────────────────────────────────────
-function showLoading(show) {
-  document.getElementById('placeholder').style.display = show ? 'none' : '';
-  document.getElementById('loading').style.display     = show ? 'flex' : 'none';
-  document.getElementById('result-content').style.display = 'none';
-}
-
-function showResult() {
-  document.getElementById('placeholder').style.display = 'none';
-  document.getElementById('loading').style.display     = 'none';
-  document.getElementById('result-content').style.display = '';
-
-  const school   = document.getElementById('school').value === '직접입력' ? document.getElementById('schoolCustom').value : document.getElementById('school').value;
-  const subject  = document.getElementById('subject').value;
-  const examType = document.getElementById('examType').value;
-  document.getElementById('toolbar-title').textContent = `${school} ${document.getElementById('grade').value} ${examType} — ${subject}`;
-  document.getElementById('toolbar-status').textContent = '✅ 생성 완료 · PDF 버튼으로 즉시 다운로드';
-}
-
-function showError(msg) {
-  document.getElementById('placeholder').style.display = 'none';
-  document.getElementById('loading').style.display     = 'none';
-  document.getElementById('result-content').style.display = '';
-  document.getElementById('examSheetRender').innerHTML = `<div class="error-box">❌ ${escapeHtml(msg)}</div>`;
-}
-
-function enablePDFButtons() {
-  ['btnExamPDF','btnAnsPDF','btnBothPDF'].forEach(id => document.getElementById(id).disabled = false);
-}
-
-// ─────────────────────────────────────────
-// PDF 생성
-// ─────────────────────────────────────────
-async function downloadPDF(type) {
-  const overlay = document.getElementById('pdf-overlay');
-  const msg     = document.getElementById('pdf-overlay-msg');
-  overlay.classList.add('show');
-
-  const school   = document.getElementById('school').value === '직접입력' ? document.getElementById('schoolCustom').value : document.getElementById('school').value;
-  const grade    = document.getElementById('grade').value;
-  const subject  = document.getElementById('subject').value;
-  const examType = document.getElementById('examType').value;
-  const today    = new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','');
-
-  try {
-    if (type === 'exam') {
-      msg.textContent = '시험지 PDF 생성 중...';
-      await renderToPDF(
-        document.getElementById('examSheetRender'),
-        `${school}_${grade}_${examType}_${subject}_시험지_${today}.pdf`
-      );
-    } else {
-      msg.textContent = '해설지 PDF 생성 중...';
-      await renderToPDF(
-        document.getElementById('ansSheetRender'),
-        `${school}_${grade}_${examType}_${subject}_해설지_${today}.pdf`
-      );
-    }
-  } catch(e) {
-    alert('PDF 생성 오류: ' + e.message);
-  } finally {
-    overlay.classList.remove('show');
-  }
-}
-
-async function downloadBothPDF() {
-  const overlay = document.getElementById('pdf-overlay');
-  const msg     = document.getElementById('pdf-overlay-msg');
-  overlay.classList.add('show');
-
-  const school   = document.getElementById('school').value === '직접입력' ? document.getElementById('schoolCustom').value : document.getElementById('school').value;
-  const grade    = document.getElementById('grade').value;
-  const subject  = document.getElementById('subject').value;
-  const examType = document.getElementById('examType').value;
-  const today    = new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','');
-
-  try {
-    msg.textContent = '시험지 PDF 생성 중... (1/2)';
-    await renderToPDF(
-      document.getElementById('examSheetRender'),
-      `${school}_${grade}_${examType}_${subject}_시험지_${today}.pdf`
-    );
-    await sleep(400);
-    msg.textContent = '해설지 PDF 생성 중... (2/2)';
-    await renderToPDF(
-      document.getElementById('ansSheetRender'),
-      `${school}_${grade}_${examType}_${subject}_해설지_${today}.pdf`
-    );
-  } catch(e) {
-    alert('PDF 생성 오류: ' + e.message);
-  } finally {
-    overlay.classList.remove('show');
-  }
-}
-
-async function renderToPDF(sourceEl, filename) {
-  const { jsPDF } = window.jspdf;
-
-  // 숨김 전용 캡처 컨테이너에 복사
-  const clone = sourceEl.cloneNode(true);
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;top:0;left:-9999px;width:860px;background:#fff;padding:36px 48px;z-index:-9999;';
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
-
-  // MathJax 렌더링
-  if (window.MathJax) {
-    await MathJax.typesetPromise([wrapper]).catch(() => {});
-  }
-  await sleep(600);
-
-  // html2canvas 캡처
-  const canvas = await html2canvas(wrapper, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    logging: false,
-    width: 860,
-    windowWidth: 960
-  });
-
-  // 컨테이너 제거
-  document.body.removeChild(wrapper);
-
-  const imgData = canvas.toDataURL('image/png');
-  const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW   = pdf.internal.pageSize.getWidth();
-  const pageH   = pdf.internal.pageSize.getHeight();
-  const margin  = 10;
-  const imgW    = pageW - margin * 2;
-  const imgH    = (canvas.height * imgW) / canvas.width;
-  const pageContentH = pageH - margin * 2;
-
-  if (imgH <= pageContentH) {
-    pdf.addImage(imgData, 'PNG', margin, margin, imgW, imgH);
-  } else {
-    let srcY = 0;
-    const ratio = canvas.width / imgW;
-    while (srcY < canvas.height) {
-      const sliceH = Math.min(pageContentH * ratio, canvas.height - srcY);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width  = canvas.width;
-      sliceCanvas.height = sliceH;
-      sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceH / ratio);
-      srcY += sliceH;
-      if (srcY < canvas.height) pdf.addPage();
-    }
-  }
-
-  pdf.save(filename);
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// init
+switchMode('analyze');
 </script>
 </body>
 </html>
