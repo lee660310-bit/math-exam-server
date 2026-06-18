@@ -1158,7 +1158,15 @@ async function renderToPDF(sourceEl, filename) {
   if (window.MathJax) {
     await MathJax.typesetPromise([sourceEl]).catch(() => {});
   }
-  await sleep(300);
+
+  // 숨김 탭인 경우 임시로 강제 표시
+  const parentPanel = sourceEl.closest('.result-panel');
+  const wasHidden = parentPanel && !parentPanel.classList.contains('active');
+  if (wasHidden) {
+    parentPanel.style.cssText = 'display:block !important; position:fixed; top:-99999px; left:0; width:900px; background:#fff; z-index:-1;';
+  }
+
+  await sleep(500);
 
   // html2canvas로 캡처
   const canvas = await html2canvas(sourceEl, {
@@ -1168,6 +1176,11 @@ async function renderToPDF(sourceEl, filename) {
     logging: false,
     windowWidth: 900
   });
+
+  // 원상복구
+  if (wasHidden) {
+    parentPanel.style.cssText = '';
+  }
 
   const imgData  = canvas.toDataURL('image/png');
   const pdf      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
