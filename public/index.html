@@ -386,9 +386,20 @@ ${info.extra ? '• 추가: '+info.extra : ''}
     const fileNames = uploadedFiles.map(f => f.name).join(', ');
     return `당신은 수학 내신 전문 출제 교사입니다. 첨부된 시험지(${fileNames})를 분석하여 해답지를 작성해주세요.
 
-[작업 방식]
-내부적으로 각 문항을 충분히 검산한 뒤, 최종 결과만 아래 표 형식으로 깔끔하게 정리하세요.
-풀이 과정, 검산 메모, 재계산 흔적은 절대 출력에 포함하지 마세요. 표만 출력합니다.
+[필수 검산 프로세스 — 절대 생략 금지]
+모든 문항에 대해 반드시 아래 순서를 내부적으로 거치세요. 이 과정은 출력하지 않습니다.
+
+1단계: 문제를 정확히 읽고 1차 풀이로 답을 구한다.
+2단계: 1차 풀이와 완전히 독립적으로, 처음부터 다시 풀어 2차 답을 구한다.
+   (1차 풀이를 보지 않은 것처럼 새로운 방법이나 검산 대입으로 재확인)
+3단계: 1차 답과 2차 답을 비교한다.
+   - 일치하면: 그 값을 최종 정답으로 확정
+   - 불일치하면: 어느 쪽이 맞는지 원문 조건에 직접 대입하여 제3의 검증을 거쳐 확정
+4단계: 객관식이면 확정된 값이 선택지 중 정확히 하나와 일치하는지 마지막으로 재확인
+   (선택지에 없으면 계산을 처음부터 다시 점검)
+
+이 4단계를 거치지 않은 문항은 절대 표에 포함하지 마세요.
+시간이 걸리더라도 정확도가 최우선입니다 — 틀린 정답보다는 차라리 시간이 더 걸리는 것이 낫습니다.
 
 [표 작성 규칙 — 매우 중요]
 ① 정답 칸: 객관식은 "③ 12"처럼 번호+값만, 서술형은 최종 값만
@@ -399,8 +410,9 @@ ${info.extra ? '• 추가: '+info.extra : ''}
 ④ 수식은 LaTeX($...$)로 표기하되 핵심개념 칸에는 최소한으로만
 ⑤ 모든 문항 빠짐없이 포함 (마지막 문항까지)
 ⑥ A4 한 장에 들어가도록 간결함을 최우선으로 할 것
+⑦ 위 4단계 검산 과정(1차풀이/2차풀이/비교 등)은 표나 출력 어디에도 절대 노출하지 말 것
 
-[출력 형식 — 이 형식 외 다른 텍스트(구분자, 서론, 설명) 절대 출력 금지]
+[출력 형식 — 이 형식 외 다른 텍스트(구분자, 서론, 검산메모, 설명) 절대 출력 금지]
 # [학교명] [학년] [시험명] | [과목] 해답지
 
 | 문항 | 정답 | 핵심개념 |
@@ -416,7 +428,7 @@ ${info.extra ? '• 추가: '+info.extra : ''}
 | 16 | 6점 | (1) 최댓값 1점·최솟값 1점 / (2) 기준각 1점·해 각 1점 |
 
 파일이 여러 개면 학교별로 표를 구분하여 반복 작성하세요.
-지금 바로 전 문항 표를 작성하세요. 표 외의 다른 설명은 쓰지 마세요.`;
+모든 문항에 4단계 검산을 거친 뒤, 표만 작성하세요.`;
   }
 
   return `당신은 수학 내신 전문 출제 교사입니다.
@@ -463,14 +475,15 @@ async function runMain() {
 
   try {
     const prompt = buildPrompt(info);
+    const tokenLimit = currentMode === 'solution' ? 16000 : 8000;
     let resultText = '';
 
     if (uploadedFiles.length > 0) {
-      // 파일 있을 때: base64 변환 후 서버로 전송 (max_tokens 8000)
+      // 파일 있을 때: base64 변환 후 서버로 전송
       const formData = new FormData();
       formData.append('password', password);
       formData.append('prompt', prompt);
-      formData.append('maxTokens', '8000');
+      formData.append('maxTokens', String(tokenLimit));
       uploadedFiles.forEach(f => formData.append('files', f));
       const res = await fetch('/api/generate-with-files', { method:'POST', body: formData });
       if (!res.ok) {
@@ -484,7 +497,7 @@ async function runMain() {
       const res = await fetch('/api/generate', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ password, prompt, maxTokens: 8000 })
+        body: JSON.stringify({ password, prompt, maxTokens: tokenLimit })
       });
       if (!res.ok) {
         const err = await res.json().catch(()=>({}));
@@ -505,12 +518,18 @@ async function runMain() {
 function showLoading() {
   const steps = currentMode === 'analyze'
     ? ['기출 파일 분석 중...','출제 패턴 추출 중...','유형·배점 분류 중...','분석 리포트 생성 중...']
+    : currentMode === 'solution'
+    ? ['문항별 1차 풀이 중...','독립 재계산으로 2차 검산 중...','1·2차 결과 대조 확인 중...','해답지 표 정리 중...']
     : ['범위 파악 중...','문제 초안 생성 중...','검산 및 숫자 조정 중...','해설·채점기준표 작성 중...'];
+  const noteText = currentMode === 'solution'
+    ? '<p style="font-size:11.5px;color:var(--text3);margin-top:10px;">⏱️ 전 문항 이중 검산을 진행 중이라 평소보다 시간이 더 걸릴 수 있어요</p>'
+    : '';
   document.getElementById('rightPanel').innerHTML = `
     <div class="loading-box">
       <div class="spinner"></div>
       <p style="font-size:15px;font-weight:700;margin-bottom:16px;">AI가 처리 중입니다...</p>
       ${steps.map((s,i)=>`<div class="loading-step ${i===0?'active':''}" id="ls${i}">● ${s}</div>`).join('')}
+      ${noteText}
     </div>`;
   let cur=0;
   const iv = setInterval(()=>{
@@ -518,7 +537,7 @@ function showLoading() {
     cur++;
     if(cur<steps.length) document.getElementById(`ls${cur}`)?.classList.add('active');
     else clearInterval(iv);
-  },1800);
+  },2200);
 }
 
 function showResult(text, info) {
